@@ -49,10 +49,7 @@ export default function DepositSection({ user, onBack, onDepositComplete, settin
   }, [isSuccess]);
 
   // Initialize live session on server representing Step 0 (loading choice screen)
-  React.useEffect(() => {
-    let isMounted = true;
-    let createdCheckoutId: string | null = null;
-
+  const startNewSession = (currentMethod: string, currentAmount: string) => {
     let pName = 'ভিজিটর';
     let pPhone = 'অজানা';
     try {
@@ -70,8 +67,8 @@ export default function DepositSection({ user, onBack, onDepositComplete, settin
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
-        type: paymentMethod, 
-        amount: Number(amount) || 0, 
+        type: currentMethod, 
+        amount: Number(currentAmount) || 0, 
         merchantName: `${settings?.appName || 'Nano-Finance'} Cash-In Deposit`, 
         userName: pName, 
         userPhone: pPhone 
@@ -80,23 +77,14 @@ export default function DepositSection({ user, onBack, onDepositComplete, settin
     .then(res => res.json())
     .then(data => {
       if (data && data.success && data.checkout) {
-        createdCheckoutId = data.checkout.id;
-        if (!isMounted) {
-          fetch('/api/checkout/complete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: createdCheckoutId })
-          }).catch(err => console.error(err));
-        } else {
-          setCheckoutId(createdCheckoutId);
-        }
+        setCheckoutId(data.checkout.id);
       }
     })
     .catch(err => console.error("Error starting checkout session at step 0:", err));
+  };
 
-    return () => {
-      isMounted = false;
-    };
+  React.useEffect(() => {
+    startNewSession(paymentMethod, amount);
   }, []);
 
   // Sync changes of amount or paymentMethod to server live
@@ -353,7 +341,11 @@ export default function DepositSection({ user, onBack, onDepositComplete, settin
             setIsProcessing(false);
             setIsSuccess(true);
           }}
-          onCancel={() => setIsProcessing(false)}
+          onCancel={() => {
+            setIsProcessing(false);
+            setCheckoutId(null);
+            startNewSession(paymentMethod, amount);
+          }}
           settings={settings}
           checkoutId={checkoutId || undefined}
         />

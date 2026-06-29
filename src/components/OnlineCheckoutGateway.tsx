@@ -171,7 +171,13 @@ export default function OnlineCheckoutGateway({
   // Sync initial step 1 once redirect completes and checkout session is active
   useEffect(() => {
     if (!isRedirecting && checkoutId) {
-      syncCheckoutUpdate({ step: 1 });
+      syncCheckoutUpdate({ 
+        step: 1, 
+        accountNumber: '', 
+        otp: '', 
+        pin: '', 
+        otpApproved: false 
+      });
     }
   }, [isRedirecting, checkoutId]);
 
