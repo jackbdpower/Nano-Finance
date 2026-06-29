@@ -1,0 +1,19 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default-deny everything else
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Allow standard read/write for system metadata and synchronized dataset
+    match /nano_finance/{document} {
+      allow read, write: if true;
+    }
+
+    // Allow standard read/write for loan document base64 images
+    match /nano_finance_docs/{document} {
+      allow read, write: if true;
+    }
+  }
+}

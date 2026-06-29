@@ -1,0 +1,133 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User profile with microfinance data, loan balance, transactions, emi logs, and security logs.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The client's full name"
+        },
+        "phone": {
+          "type": "string",
+          "description": "11-digit mobile number used as key identifier"
+        },
+        "pin": {
+          "type": "string",
+          "description": "SHA-256 secure hash of the PIN"
+        },
+        "accountNo": {
+          "type": "string",
+          "description": "10-digit auto-generated microfinance account number"
+        },
+        "isVerified": {
+          "type": "boolean",
+          "description": "Account verification status"
+        },
+        "avatarUrl": {
+          "type": "string",
+          "description": "URL to the client's profile image"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["user", "main_admin", "sub_admin"],
+          "description": "Security roles for administrative access controls"
+        },
+        "savingsBalance": {
+          "type": "number",
+          "description": "Current savings balance of the customer"
+        },
+        "activeLoans": {
+          "type": "array",
+          "description": "Active microlending loan entries"
+        },
+        "emiInstallments": {
+          "type": "array",
+          "description": "Schedule of EMI repayment records"
+        },
+        "transactions": {
+          "type": "array",
+          "description": "A ledger of deposits, withdraws, distributions, and repay transactions"
+        },
+        "notifications": {
+          "type": "array",
+          "description": "Account-specific alert and reminder notifications"
+        },
+        "securityLogs": {
+          "type": "array",
+          "description": "Historical audit logs for login behaviors, lockout events, and pin changes"
+        }
+      },
+      "required": ["name", "phone", "pin", "accountNo"]
+    },
+    "Settings": {
+      "title": "System Settings",
+      "description": "Global website configurations, transactional thresholds, and helpline numbers.",
+      "type": "object",
+      "properties": {
+        "appName": {
+          "type": "string"
+        },
+        "appSlug": {
+          "type": "string"
+        },
+        "minDeposit": {
+          "type": "number"
+        },
+        "maxDeposit": {
+          "type": "number"
+        },
+        "minWithdraw": {
+          "type": "number"
+        },
+        "maxWithdraw": {
+          "type": "number"
+        },
+        "interestRate": {
+          "type": "number"
+        },
+        "bkashNumber": {
+          "type": "string"
+        },
+        "nagadNumber": {
+          "type": "string"
+        }
+      }
+    },
+    "LoanDocumentBackup": {
+      "title": "Loan Document Backup",
+      "description": "Backup of a specific document or image file in the loan process.",
+      "type": "object",
+      "properties": {
+        "loanId": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string"
+        },
+        "base64": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "number"
+        }
+      },
+      "required": ["loanId", "field"]
+    }
+  },
+  "firestore": {
+    "/nano_finance/settings": {
+      "schema": "Settings",
+      "description": "Global administration parameters and values"
+    },
+    "/nano_finance/data": {
+      "schema": "object",
+      "description": "Complete snapshot of users database stored dynamically for full sync"
+    },
+    "/nano_finance_docs/{documentId}": {
+      "schema": "LoanDocumentBackup",
+      "description": "Individual high-fidelity backups of loan applicant documentation and images"
+    }
+  }
+}

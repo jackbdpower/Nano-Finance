@@ -1,0 +1,290 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&family=Noto+Sans+Bengali:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-primary-base: #c5a059;
+  --color-primary-dark: #b38e48;
+  --color-primary-light: #dfc187;
+  --color-success-base: #10b981;
+  --color-warning-base: #f59e0b;
+  --color-error-base: #ef4444;
+  --color-bg-light: #0a0a0a;
+  
+  --font-sans: "Noto Sans Bengali", "Inter", sans-serif;
+  --font-serif: "Cormorant Garamond", Georgia, serif;
+  --font-mono: "JetBrains Mono", monospace;
+  
+  --color-zinc-50: #fafafa;
+  --color-zinc-100: #f4f4f5;
+  --color-zinc-200: #e4e4e7;
+  --color-zinc-300: #d4d4d8;
+  --color-zinc-400: #a1a1aa;
+  --color-zinc-500: #71717a;
+  --color-zinc-650: #4b4b54;
+  --color-zinc-700: #3f3f46;
+  --color-zinc-800: #27272a;
+  --color-zinc-850: #1f1f23;
+  --color-zinc-900: #18181b;
+  --color-zinc-950: #09090b;
+}
+
+/* Custom scrollbars for simulator lists */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+/* Glassmorphism custom dark panel */
+.glass-panel {
+  background: rgba(18, 18, 18, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(197, 160, 89, 0.15);
+}
+
+body {
+  background-color: #050505;
+  color: #e4e4e7;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* ================== DYNAMIC LIGHT THEME OVERRIDES ================== */
+:root.light {
+  /* Invert Tailwind variables to automatically support all standard classes */
+  --color-bg-light: #ffffff;
+  --color-zinc-950: #fcfcfd;
+  --color-zinc-900: #f9fafb;
+  --color-zinc-850: #f3f4f6;
+  --color-zinc-800: #e5e7eb;
+  --color-zinc-700: #d1d5db;
+  --color-zinc-650: #9ca3af;
+  --color-zinc-600: #6b7280;
+  --color-zinc-500: #4b5563;
+  --color-zinc-400: #374151;
+  --color-zinc-300: #1f2937;
+  --color-zinc-200: #111827;
+  --color-zinc-100: #0f172a;
+  --color-zinc-50: #020617;
+
+  /* Custom primary palette high-contrast translation for light mode */
+  --color-primary-light: #8c6827;
+  --color-primary-base: #926f2f;
+  --color-primary-dark: #6e501a;
+  
+  background-color: #f3f4f6;
+  color: #111827;
+}
+
+:root.light body {
+  background-color: #f3f4f6 !important;
+  color: #111827 !important;
+}
+
+/* Base high-fidelity backgrounds mapping to light mode equivalents */
+:root.light [class*="bg-[#050505]"],
+:root.light [class*="bg-[#0a0a09]"],
+:root.light [class*="bg-[#0e0e11]"],
+:root.light .bg-black,
+:root.light [class*="bg-black "] {
+  background-color: #f3f4f6 !important;
+}
+
+/* Main app backgrounds, panels, and inner modules */
+:root.light [class*="bg-[#111113]"],
+:root.light [class*="bg-[#121212]"],
+:root.light [class*="bg-[#121214]"],
+:root.light [class*="bg-[#121215]"],
+:root.light [class*="bg-[#0c0c0e]"],
+:root.light [class*="bg-[#0e0e0f]"] {
+  background-color: #ffffff !important;
+}
+
+/* Soft sidebar and panel headers */
+:root.light [class*="bg-[#08080a]"],
+:root.light [class*="bg-[#0d0d0e]"],
+:root.light [class*="bg-[#141415]"],
+:root.light [class*="bg-[#141416]"],
+:root.light [class*="bg-[#15151a]"] {
+  background-color: #f9fafb !important;
+}
+
+/* Semi-transparent overlays & backdrops */
+:root.light [class*="bg-black/85"],
+:root.light [class*="bg-zinc-950/45"] {
+  background-color: rgba(15, 23, 42, 0.45) !important;
+}
+
+/* Elevated glass containers and blur settings */
+:root.light .glass-panel {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-color: rgba(197, 160, 89, 0.35) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+}
+
+/* Dynamic border transformations for inline arbitrary classes to maintain sharp layouts */
+:root.light [class*="border-zinc-800"],
+:root.light [class*="border-zinc-850"],
+:root.light [class*="border-zinc-900"],
+:root.light [class*="border-zinc-950"],
+:root.light [class*="border-zinc-700"] {
+  border-color: #e5e7eb !important;
+}
+
+:root.light [class*="hover:border-zinc-800"]:hover,
+:root.light [class*="hover:border-zinc-900"]:hover {
+  border-color: #d1d5db !important;
+}
+
+/* Gold details borders updated for light contrast */
+:root.light [class*="border-[#c5a059]"] {
+  border-color: rgba(197, 160, 89, 0.5) !important;
+}
+
+/* Ensure arbitrary inline text definitions have ultra-rich contrast */
+:root.light [class*="text-[#dfc187]"] {
+  color: #8c6827 !important; /* Perfect rich premium golden-bronze */
+}
+
+/* Primary Brand Gold transforms into a sharper, rich color for light backgrounds */
+:root.light [class*="text-[#c5a059]"] {
+  color: #926f2f !important;
+}
+
+:root.light [class*="hover:text-[#dfc187]"]:hover {
+  color: #8c6827 !important;
+}
+
+/* Explicit high-contrast text color overrides to completely solve visibility issues */
+:root.light .text-white,
+:root.light [class*="text-white"],
+:root.light .text-zinc-50,
+:root.light .text-zinc-100,
+:root.light .text-zinc-200,
+:root.light .text-zinc-300,
+:root.light [class*="text-zinc-50"],
+:root.light [class*="text-zinc-100"],
+:root.light [class*="text-zinc-200"],
+:root.light [class*="text-zinc-300"] {
+  color: #111827 !important;
+}
+
+:root.light .text-zinc-400,
+:root.light .text-zinc-500,
+:root.light [class*="text-zinc-400"],
+:root.light [class*="text-zinc-500"] {
+  color: #374151 !important;
+}
+
+:root.light .text-zinc-650,
+:root.light .text-zinc-700,
+:root.light [class*="text-zinc-650"],
+:root.light [class*="text-zinc-700"] {
+  color: #4b5563 !important;
+}
+
+/* Gold details backgrounds */
+:root.light [class*="bg-[#c5a059]"] {
+  background-color: #c5a059 !important;
+  color: #0b0f19 !important;
+}
+:root.light [class*="bg-[#c5a059]"] * {
+  color: #0b0f19 !important;
+}
+:root.light [class*="bg-[#c5a059]/15"] {
+  background-color: rgba(197, 160, 89, 0.25) !important;
+}
+
+/* Extra status color calibrations for beautiful accessibility */
+:root.light .text-amber-200,
+:root.light .text-amber-300,
+:root.light .text-amber-400,
+:root.light [class*="text-amber-200"],
+:root.light [class*="text-amber-"] {
+  color: #b45309 !important; /* Darker warm amber */
+}
+
+:root.light .text-emerald-400,
+:root.light .text-emerald-500,
+:root.light [class*="text-emerald-400"],
+:root.light [class*="text-emerald-"],
+:root.light [class*="text-green-"] {
+  color: #047857 !important; /* Rich green */
+}
+
+:root.light .text-rose-400,
+:root.light .text-red-400,
+:root.light [class*="text-rose-400"],
+:root.light [class*="text-red-400"],
+:root.light [class*="text-rose-"],
+:root.light [class*="text-red-"] {
+  color: #b91c1c !important; /* Clear dark red */
+}
+
+/* High contrast status badge backgrounds and borders */
+:root.light [class*="bg-amber-950/30"],
+:root.light [class*="bg-amber-500/10"],
+:root.light [class*="bg-amber-500/15"] {
+  background-color: #fef3c7 !important;
+  border-color: #f59e0b !important;
+  color: #b45309 !important;
+}
+:root.light [class*="bg-emerald-950/30"],
+:root.light [class*="bg-emerald-500/10"],
+:root.light [class*="bg-emerald-500/15"] {
+  background-color: #d1fae5 !important;
+  border-color: #10b981 !important;
+  color: #047857 !important;
+}
+:root.light [class*="bg-red-950/30"],
+:root.light [class*="bg-red-500/10"],
+:root.light [class*="bg-red-500/15"],
+:root.light [class*="bg-rose-950/30"] {
+  background-color: #fee2e2 !important;
+  border-color: #f87171 !important;
+  color: #b91c1c !important;
+}
+
+/* Modals overlays & blur background */
+:root.light [class*="bg-black/80"],
+:root.light [class*="bg-black/50"],
+:root.light [class*="bg-zinc-950/80"] {
+  background-color: rgba(15, 23, 42, 0.45) !important;
+}
+
+/* High fidelity styling for inputs, selects, textareas, and labels */
+:root.light input,
+:root.light select,
+:root.light textarea,
+:root.light input[type="text"],
+:root.light input[type="password"],
+:root.light input[type="tel"] {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border-color: #d1d5db !important;
+}
+
+:root.light input::placeholder,
+:root.light select::placeholder {
+  color: #6b7280 !important;
+}
+
+/* Active links / Buttons text tweak inside light theme lists */
+:root.light [class*="hover:bg-zinc-900"]:hover,
+:root.light [class*="hover:bg-zinc-950"]:hover {
+  background-color: #f3f4f6 !important;
+}
+
+:root.light [class*="bg-zinc-950/45"] {
+  background-color: #f4f4f5 !important;
+}
+
+/* Smooth transition for theme switches */
+* {
+  transition-property: background-color, border-color, text-decoration-color, fill, stroke;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
