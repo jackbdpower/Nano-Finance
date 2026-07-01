@@ -1393,8 +1393,49 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
         {activeTab === 'overview' && (
           <div className="flex flex-col gap-4">
             
+            {/* Supabase Setup Required Notice */}
+            {syncStatus?.status === 'failed' && syncStatus?.error?.includes('SUPABASE_SETUP_REQUIRED') && (
+              <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-4 py-3.5 rounded-2xl flex flex-col gap-2.5 text-xs font-sans">
+                <div className="flex items-start gap-3">
+                  <ShieldAlert className="w-5 h-5 shrink-0 text-emerald-400 mt-0.5" />
+                  <div>
+                    <h4 className="font-bold text-white tracking-wide text-sm font-sans">Supabase টেবিল তৈরি করুন (টেবিল অনুপস্থিত)</h4>
+                    <p className="mt-1 text-zinc-300 leading-relaxed font-sans">
+                      আপনার Supabase ডাটাবেজ সফলভাবে সংযুক্ত হয়েছে কিন্তু <b>nano_finance</b> টেবিলটি খুঁজে পাওয়া যায়নি।
+                      দয়া করে আপনার Supabase প্রজেক্ট ড্যাশবোর্ডের <b>SQL Editor</b>-এ গিয়ে নিচের কোডটি পেস্ট করে <b>Run</b> বাটনে ক্লিক করুন:
+                    </p>
+                  </div>
+                </div>
+                <div className="bg-black/50 border border-zinc-800 p-3.5 rounded-xl font-mono text-[11px] text-zinc-200 select-all whitespace-pre-wrap leading-relaxed overflow-x-auto relative">
+                  <div className="absolute top-1.5 right-2 bg-zinc-800 text-zinc-400 text-[9px] px-1.5 py-0.5 rounded font-sans uppercase">SQL Editor Code</div>
+{`create table nano_finance (
+  id text primary key,
+  data jsonb,
+  updated_at timestamp with time zone default now()
+);`}
+                </div>
+              </div>
+            )}
+
+            {/* Supabase General Connection Error Notice */}
+            {syncStatus?.status === 'failed' && syncStatus?.error?.includes('SUPABASE_ERROR') && !syncStatus?.error?.includes('SUPABASE_SETUP_REQUIRED') && (
+              <div className="bg-rose-500/10 border border-rose-500/20 text-rose-500 px-4 py-3.5 rounded-2xl flex items-start gap-3 text-xs font-sans">
+                <ShieldAlert className="w-5 h-5 shrink-0 text-rose-500 mt-0.5" />
+                <div>
+                  <h4 className="font-bold text-white tracking-wide text-sm">Supabase সংযোগ ত্রুটি</h4>
+                  <p className="mt-1 text-zinc-300 leading-relaxed font-sans">
+                    Supabase ড্যাশবোর্ডের সাথে সংযোগ স্থাপন করা সম্ভব হচ্ছে না। 
+                    দয়া করে নিশ্চিত করুন যে আপনার <b>SUPABASE_URL</b> এবং <b>SUPABASE_KEY</b> সঠিক আছে এবং প্রজেক্টটি সক্রিয় আছে।
+                  </p>
+                  <p className="mt-2 text-zinc-500 font-mono text-[10px] bg-black/20 p-2 rounded border border-zinc-950">
+                    Error Details: {syncStatus.error}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Cloud Sync Status warning banner if quota is exhausted */}
-            {syncStatus?.status === 'failed' && (syncStatus?.error?.includes('Quota') || syncStatus?.error?.includes('QUOTA') || syncStatus?.error?.includes('exhaust') || syncStatus?.error?.includes('EXHAUSTED')) && (
+            {syncStatus?.status === 'failed' && !syncStatus?.error?.includes('SUPABASE') && (syncStatus?.error?.includes('Quota') || syncStatus?.error?.includes('QUOTA') || syncStatus?.error?.includes('exhaust') || syncStatus?.error?.includes('EXHAUSTED')) && (
               <div className="bg-amber-500/10 border border-amber-500/20 text-amber-500 px-4 py-3.5 rounded-2xl flex items-start gap-3 text-xs font-sans">
                 <ShieldAlert className="w-5 h-5 shrink-0 text-amber-500 mt-0.5" />
                 <div>
@@ -1408,12 +1449,12 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
             )}
 
             {/* Cloud Sync Status warning banner for other sync failures */}
-            {syncStatus?.status === 'failed' && !(syncStatus?.error?.includes('Quota') || syncStatus?.error?.includes('QUOTA') || syncStatus?.error?.includes('exhaust') || syncStatus?.error?.includes('EXHAUSTED')) && (
+            {syncStatus?.status === 'failed' && !syncStatus?.error?.includes('SUPABASE') && !(syncStatus?.error?.includes('Quota') || syncStatus?.error?.includes('QUOTA') || syncStatus?.error?.includes('exhaust') || syncStatus?.error?.includes('EXHAUSTED')) && (
               <div className="bg-rose-500/10 border border-rose-500/20 text-rose-500 px-4 py-3.5 rounded-2xl flex items-start gap-3 text-xs font-sans">
                 <ShieldAlert className="w-5 h-5 shrink-0 text-rose-500 mt-0.5" />
                 <div>
                   <h4 className="font-bold text-white tracking-wide">ক্লাউড ডাটাবেজ সিঙ্ক সমস্যা</h4>
-                  <p className="mt-1 text-zinc-400 leading-relaxed">
+                  <p className="mt-1 text-zinc-400 leading-relaxed font-sans">
                     সার্ভারের ক্লাউড ডাটাবেজের সাথে সংযোগ বিঘ্নিত হয়েছে। সকল এডিটিং ও ব্যালেন্স সমন্বয় সাময়িকভাবে <b>লোকাল সেফ-মেমোরি মোডে</b> সংরক্ষিত হচ্ছে।
                   </p>
                 </div>

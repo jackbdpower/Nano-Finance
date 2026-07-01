@@ -5,6 +5,7 @@ import crypto from "crypto";
 import { createServer as createViteServer } from "vite";
 import { initializeApp } from "firebase/app";
 import { initializeFirestore, doc, getDoc, setDoc, setLogLevel, terminate } from "firebase/firestore";
+import { createClient } from "@supabase/supabase-js";
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
@@ -32,6 +33,17 @@ app.use((req, res, next) => {
 
 // Database Path
 const DB_PATH = path.join(process.cwd(), "db.json");
+
+// Supabase Configuration
+let supabaseClient: any = null;
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY;
+
+if (supabaseUrl && supabaseKey) {
+  supabaseClient = createClient(supabaseUrl, supabaseKey, {
+    auth: { persistSession: false }
+  });
+}
 
 // Firebase Configuration & Initialization Layer
 let firebaseDb: any = null;
@@ -280,6 +292,16 @@ function mergeDatabases(localDb: any, remoteDb: any) {
 
 async function initFirebaseAndLoadDB() {
   loadQuotaStatus();
+  
+  const disableFirebase = process.env.DISABLE_FIREBASE === "true";
+  if (disableFirebase) {
+    console.log("[Firebase-Sync] Firebase is manually disabled via DISABLE_FIREBASE env. Operating purely in Local High-Performance File Mode.");
+    dbCache = readLocalDB();
+    lastSyncStatus = "idle";
+    lastSyncError = "MANUALLY_DISABLED: Firebase is disabled. Local high-performance file database is active.";
+    return;
+  }
+
   if (quotaExhausted && Date.now() < quotaExhaustedUntil) {
     console.log("[Firebase-Sync] Firestore usage quota is currently exhausted (cooldown active). Operating purely in Local Safe-Memory Backup Mode.");
     dbCache = readLocalDB();
@@ -373,7 +395,7 @@ async function initFirebaseAndLoadDB() {
 }
 
 async function syncToFirestore() {
-  if (!firebaseDb || !dbCache) return;
+  if (process.env.DISABLE_FIREBASE === "true" || !firebaseDb || !dbCache) return;
   
   // If we are currently experiencing a quota exhaustion cooldown, skip cloud writes completely
   if (quotaExhausted && Date.now() < quotaExhaustedUntil) {
@@ -409,6 +431,134 @@ async function syncToFirestore() {
     } else {
       lastSyncError = errorMsg;
       console.error("[Firebase-Sync] Failed to sync database cache to Firestore:", error);
+    }
+  }
+}
+
+async function initSupabaseAndLoadDB() {
+  if (!supabaseClient) {
+    dbCache = readLocalDB();
+    lastSyncStatus = "failed";
+    lastSyncError = "SUPABASE_ERROR: Supabase client is not initialized. Please configure SUPABASE_URL and SUPABASE_KEY.";
+    return;
+  }
+
+  try {
+    console.log("[Supabase-Sync] Fetching database cache from Supabase table 'nano_finance'...");
+    const { data, error } = await supabaseClient
+      .from("nano_finance")
+      .select("data")
+      .eq("id", "data")
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    if (data && data.data) {
+      console.log("[Supabase-Sync] Database cache loaded from Supabase! Merging with local copy...");
+      const remoteDb = data.data;
+      const localDb = readLocalDB();
+      dbCache = mergeDatabases(localDb, remoteDb);
+      
+      try {
+        fs.writeFileSync(DB_PATH, JSON.stringify(dbCache, null, 2), "utf-8");
+      } catch (err) {
+        console.error("[Supabase-Sync] Failed to save merged database locally:", err);
+      }
+
+      lastSyncedChecksum = JSON.stringify(dbCache);
+      lastSyncStatus = "success";
+      lastSyncTime = Date.now();
+      lastSyncError = null;
+      console.log("[Supabase-Sync] Database cache successfully synchronized and merged from Supabase!");
+
+      // If we merged new local data, save back to Supabase
+      const remoteRawChecksum = JSON.stringify(remoteDb);
+      if (JSON.stringify(dbCache) !== remoteRawChecksum) {
+        console.log("[Supabase-Sync] Merged local changes detected. Scheduling alignment write to Supabase...");
+        if (dbSyncTimeout) {
+          clearTimeout(dbSyncTimeout);
+        }
+        dbSyncTimeout = setTimeout(() => {
+          syncToSupabase();
+        }, 5000);
+      }
+    } else {
+      console.log("[Supabase-Sync] No data found in 'nano_finance' table. Initializing and uploading...");
+      dbCache = readLocalDB();
+      const { error: insertError } = await supabaseClient
+        .from("nano_finance")
+        .upsert({ id: "data", data: dbCache, updated_at: new Date().toISOString() });
+
+      if (insertError) {
+        throw insertError;
+      }
+
+      lastSyncedChecksum = JSON.stringify(dbCache);
+      lastSyncStatus = "success";
+      lastSyncTime = Date.now();
+      lastSyncError = null;
+      console.log("[Supabase-Sync] Initial seed successful in Supabase.");
+    }
+  } catch (error: any) {
+    let errorMsg = "";
+    if (error && typeof error === "object") {
+      errorMsg = error.message || error.details || error.hint || error.code || JSON.stringify(error);
+    } else {
+      errorMsg = String(error);
+    }
+    console.error("[Supabase-Sync] Connection or query failed:", error);
+    lastSyncStatus = "failed";
+    
+    if (errorMsg.includes("relation \"public.nano_finance\" does not exist") || errorMsg.includes("Could not find the table") || errorMsg.includes("schema cache")) {
+      lastSyncError = "SUPABASE_SETUP_REQUIRED: Please run the SQL command in Supabase SQL Editor to create the table:\n\ncreate table nano_finance (\n  id text primary key,\n  data jsonb,\n  updated_at timestamp with time zone default now()\n);";
+    } else {
+      lastSyncError = "SUPABASE_ERROR: " + errorMsg;
+    }
+    
+    // Fallback to local
+    dbCache = readLocalDB();
+  }
+}
+
+async function syncToSupabase() {
+  if (!supabaseClient || !dbCache) return;
+
+  const currentChecksum = JSON.stringify(dbCache);
+  if (currentChecksum === lastSyncedChecksum) {
+    console.log("[Supabase-Sync] No changes detected compared to last synced state. Skipping Supabase write.");
+    return;
+  }
+
+  try {
+    const { error } = await supabaseClient
+      .from("nano_finance")
+      .upsert({ id: "data", data: dbCache, updated_at: new Date().toISOString() });
+
+    if (error) {
+      throw error;
+    }
+
+    lastSyncedChecksum = currentChecksum;
+    lastSyncStatus = "success";
+    lastSyncTime = Date.now();
+    lastSyncError = null;
+    console.log("[Supabase-Sync] Changes successfully persisted in Supabase.");
+  } catch (error: any) {
+    let errorMsg = "";
+    if (error && typeof error === "object") {
+      errorMsg = error.message || error.details || error.hint || error.code || JSON.stringify(error);
+    } else {
+      errorMsg = String(error);
+    }
+    console.error("[Supabase-Sync] Sync failed:", error);
+    lastSyncStatus = "failed";
+    
+    if (errorMsg.includes("relation \"public.nano_finance\" does not exist") || errorMsg.includes("Could not find the table") || errorMsg.includes("schema cache")) {
+      lastSyncError = "SUPABASE_SETUP_REQUIRED: Please run the SQL command in Supabase SQL Editor to create the table:\n\ncreate table nano_finance (\n  id text primary key,\n  data jsonb,\n  updated_at timestamp with time zone default now()\n);";
+    } else {
+      lastSyncError = "SUPABASE_ERROR: " + errorMsg;
     }
   }
 }
@@ -891,12 +1041,16 @@ function writeDB(data: any) {
     console.error("Local fallback DB write error:", err);
   }
   
-  // Debounce sync to Cloud Firestore in background to protect against daily quota exhaustion
+  // Debounce sync to Cloud Storage in background to protect against daily quota exhaustion
   if (dbSyncTimeout) {
     clearTimeout(dbSyncTimeout);
   }
   dbSyncTimeout = setTimeout(() => {
-    syncToFirestore();
+    if (supabaseClient) {
+      syncToSupabase();
+    } else {
+      syncToFirestore();
+    }
   }, 1000); // reduced from 8000ms to 1000ms for more real-time live alignment
 }
 
@@ -912,7 +1066,9 @@ async function writeDBAsync(data: any) {
     clearTimeout(dbSyncTimeout);
   }
   
-  if (firebaseDb && !quotaExhausted) {
+  if (supabaseClient) {
+    await syncToSupabase();
+  } else if (firebaseDb && !quotaExhausted) {
     await syncToFirestore();
   }
 }
@@ -2937,8 +3093,12 @@ app.post("/api/admin/loan/update-status", async (req, res) => {
 const isProduction = process.env.NODE_ENV === "production";
 
 async function startServer() {
-  // Await Firebase connection and database caching
-  await initFirebaseAndLoadDB();
+  // Await database connection and caching (Supabase or Firebase)
+  if (supabaseClient) {
+    await initSupabaseAndLoadDB();
+  } else {
+    await initFirebaseAndLoadDB();
+  }
 
   if (!isProduction) {
     const vite = await createViteServer({

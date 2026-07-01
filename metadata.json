@@ -1,8 +1,6 @@
 {
-  "name": "Remix: Copy of Nano-Finance",
-  "description": "একটি আধুনিক ও গতিশীল ক্ষুদ্রঋণ ও সঞ্চয় ট্র্যাকার অ্যাপলেট। (A modern and dynamic microfinance \u0026 savings tracker applet modeled after Nano-Finance)",
+  "name": "Nano Finance",
+  "description": "ন্যানো-ফাইন্যান্স সিলভার অ্যাডভান্সড ড্যাশবোর্ড ও সিমুলেটর",
   "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
