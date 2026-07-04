@@ -43,6 +43,11 @@ export interface User {
   currentAddress?: string;
   permanentAddress?: string;
   createdAt?: number;
+  adminWhatsapp?: string;
+  adminSim?: string;
+  adminDisburseNumber?: string;
+  adminDisburseMethod?: string;
+  adminNotesText?: string;
 }
 
 export interface SecurityLog {
@@ -89,6 +94,11 @@ export interface LoanItem {
   incomeProofUrl?: string;
   addressProofUrl?: string;
   addressProofType?: string;
+  adminSim?: string;
+  adminDisburseNumber?: string;
+  adminDisburseMethod?: string;
+  adminNotesText?: string;
+  adminWhatsapp?: string;
 }
 
 export interface EmiInstallment {

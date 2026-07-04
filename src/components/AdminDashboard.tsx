@@ -30,6 +30,9 @@ import {
   CreditCard,
   User as UserIcon,
   Search,
+  Save,
+  ChevronDown,
+  ChevronUp,
   Clock,
   Bell,
   Eye,
@@ -54,6 +57,23 @@ async function safeJsonParse(response: Response): Promise<any> {
     console.warn("JSON parse failed warning:", err);
     return { success: false, error: "সার্ভার থেকে সঠিক ডাটা পাওয়া যায়নি।" };
   }
+}
+
+function formatBanglaPhoneNumber(value: string): string {
+  let cleaned = value.replace(/[^0-9]/g, '');
+  if (cleaned.length > 11) {
+    cleaned = cleaned.slice(0, 11);
+  }
+  if (cleaned.length >= 1 && !cleaned.startsWith('0')) {
+    cleaned = '0' + cleaned;
+  }
+  if (cleaned.length >= 2 && !cleaned.startsWith('01')) {
+    cleaned = '01' + cleaned.slice(1);
+  }
+  if (cleaned.length > 11) {
+    cleaned = cleaned.slice(0, 11);
+  }
+  return cleaned;
 }
 
 interface AdminDashboardProps {
@@ -184,7 +204,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
   const [previewDocTitle, setPreviewDocTitle] = useState<string>('');
 
   // Extended User Management states
-  const [userSubTab, setUserSubTab] = useState<'profile' | 'transactions' | 'loans' | 'logs'>('profile');
+  const [userSubTab, setUserSubTab] = useState<'profile' | 'admin_notes' | 'transactions' | 'loans' | 'logs'>('profile');
   const [showCreateUserModal, setShowCreateUserModal] = useState(false);
   const [createUserForm, setCreateUserForm] = useState({
     name: '',
@@ -207,6 +227,14 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
     email: '',
     currentAddress: '',
     permanentAddress: ''
+  });
+
+  const [adminNotesForm, setAdminNotesForm] = useState({
+    adminSim: '',
+    adminDisburseNumber: '',
+    adminDisburseMethod: 'bkash',
+    adminNotesText: '',
+    adminWhatsapp: ''
   });
 
   // Transaction state managers
@@ -249,6 +277,17 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
     totalInstallments: 12
   });
   const [editingEmis, setEditingEmis] = useState<any[]>([]);
+
+  // State for administrative loan notes & configuration
+  const [loanNotesState, setLoanNotesState] = useState<Record<string, {
+    adminSim: string;
+    adminDisburseNumber: string;
+    adminDisburseMethod: string;
+    adminNotesText: string;
+    adminWhatsapp: string;
+  }>>({});
+
+  const [expandedLoanId, setExpandedLoanId] = useState<string | null>(null);
 
   // Notification state
   const [newNoticeForm, setNewNoticeForm] = useState({
@@ -426,6 +465,44 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
         loadSystemData();
       } else {
         alert(data.error || 'প্রোফাইল আপডেট ব্যর্থ হয়েছে।');
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Update admin notes of user
+  const handleUpdateAdminNotes = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUser) return;
+    setActionLoading(true);
+    try {
+      const response = await fetch('/api/admin/user/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminPhone: operator.phone,
+          userPhone: selectedUser.phone,
+          adminSim: adminNotesForm.adminSim,
+          adminDisburseNumber: adminNotesForm.adminDisburseNumber,
+          adminDisburseMethod: adminNotesForm.adminDisburseMethod,
+          adminNotesText: adminNotesForm.adminNotesText,
+          adminWhatsapp: adminNotesForm.adminWhatsapp
+        })
+      });
+      const data = await safeJsonParse(response);
+      if (response.ok && data.success) {
+        setUsers(data.users);
+        const updated = data.users.find((u: any) => u.phone === selectedUser.phone);
+        if (updated) {
+          setSelectedUser(updated);
+        }
+        alert('অ্যাডমিন নোটস সফলভাবে আপডেট করা হয়েছে!');
+        loadSystemData();
+      } else {
+        alert(data.error || 'অ্যাডমিন নোটস আপডেট ব্যর্থ হয়েছে।');
       }
     } catch (err) {
       console.error(err);
@@ -637,6 +714,47 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
     }
   };
 
+  // Save admin notes & disburse info for a specific loan
+  const handleSaveLoanAdminNotes = async (userPhone: string, loanId: string) => {
+    const notes = loanNotesState[loanId];
+    if (!notes) {
+      alert('কোনো পরিবর্তন করা হয়নি!');
+      return;
+    }
+    setActionLoading(true);
+    try {
+      const response = await fetch('/api/admin/user/loan/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminPhone: operator.phone,
+          userPhone: userPhone,
+          loanId: loanId,
+          action: 'edit',
+          adminSim: notes.adminSim,
+          adminDisburseNumber: notes.adminDisburseNumber,
+          adminDisburseMethod: notes.adminDisburseMethod,
+          adminNotesText: notes.adminNotesText,
+          adminWhatsapp: notes.adminWhatsapp
+        })
+      });
+      const data = await safeJsonParse(response);
+      if (response.ok && data.success) {
+        setUsers(data.users);
+        alert('অ্যাডমিন নোটস ও কন্ট্রোল তথ্য সফলভাবে সংরক্ষণ করা হয়েছে!');
+        loadSystemData();
+        onStateUpdated();
+      } else {
+        alert(data.error || 'সংরক্ষণ ব্যর্থ হয়েছে।');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('সংরক্ষণ করার সময় একটি ত্রুটি ঘটেছে!');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   // Delete/cancel an existing loan record
   const handleDeleteLoan = async (loanId: string) => {
     if (!selectedUser) return;
@@ -756,6 +874,19 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
       return () => clearInterval(intervalId);
     }
   }, [operator.phone, actionLoading, selectedUser]);
+
+  // Dynamically initialize adminNotesForm whenever selectedUser changes
+  useEffect(() => {
+    if (selectedUser) {
+      setAdminNotesForm({
+        adminSim: selectedUser.adminSim || '',
+        adminDisburseNumber: selectedUser.adminDisburseNumber || '',
+        adminDisburseMethod: selectedUser.adminDisburseMethod || 'bkash',
+        adminNotesText: selectedUser.adminNotesText || '',
+        adminWhatsapp: selectedUser.adminWhatsapp || selectedUser.phone || ''
+      });
+    }
+  }, [selectedUser?.phone, selectedUser?.adminWhatsapp, selectedUser?.adminSim, selectedUser?.adminDisburseNumber, selectedUser?.adminDisburseMethod, selectedUser?.adminNotesText]);
 
   // Real-time polling of active bkash/nagad checkout sessions
   useEffect(() => {
@@ -1235,10 +1366,20 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
   const pendingLoans = allLoansList.filter((item) => item.loan.status === 'pending');
   const activeLoans = allLoansList.filter((item) => item.loan.status === 'approved');
 
-  const selectUserAndSubTab = (user: any, tab: 'profile' | 'transactions' | 'loans' | 'logs') => {
+  const selectUserAndSubTab = (user: any, tab: 'profile' | 'admin_notes' | 'transactions' | 'loans' | 'logs') => {
     setSelectedUser(user);
     setAdjustBalanceVal(Number(user.savingsBalance || 0));
     setUserSubTab(tab);
+    
+    // Always initialize adminNotesForm regardless of tab
+    setAdminNotesForm({
+      adminSim: user.adminSim || '',
+      adminDisburseNumber: user.adminDisburseNumber || '',
+      adminDisburseMethod: user.adminDisburseMethod || 'bkash',
+      adminNotesText: user.adminNotesText || '',
+      adminWhatsapp: user.adminWhatsapp || user.phone
+    });
+
     if (tab === 'profile') {
       setEditUserForm({
         name: user.name,
@@ -2124,6 +2265,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                 <div className="flex border-b border-zinc-900 pb-2 overflow-x-auto gap-1 no-scrollbar">
                   {[
                     { id: 'profile', label: 'প্রোফাইল সংশোধন', icon: <UserIcon className="w-3.5 h-3.5" /> },
+                    { id: 'admin_notes', label: 'এডমিন নোট', icon: <FileText className="w-3.5 h-3.5" /> },
                     { id: 'transactions', label: 'লেনদেন বিবরণী', icon: <CreditCard className="w-3.5 h-3.5" /> },
                     { id: 'loans', label: 'ঋণ খাতা', icon: <Landmark className="w-3.5 h-3.5" /> },
                     { id: 'logs', label: 'বিজ্ঞপ্তি ও লগ', icon: <Bell className="w-3.5 h-3.5" /> }
@@ -2263,8 +2405,9 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                             <input
                               type="text"
                               required
+                              maxLength={11}
                               value={editUserForm.phone}
-                              onChange={(e) => setEditUserForm({ ...editUserForm, phone: e.target.value })}
+                              onChange={(e) => setEditUserForm({ ...editUserForm, phone: formatBanglaPhoneNumber(e.target.value) })}
                               className="w-full bg-zinc-900 border border-zinc-800 rounded-lg py-1.5 px-3 text-xs text-white font-mono focus:outline-none"
                             />
                           </div>
@@ -2285,7 +2428,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                               type="text"
                               maxLength={11}
                               value={editUserForm.bkashNo}
-                              onChange={(e) => setEditUserForm({ ...editUserForm, bkashNo: e.target.value.replace(/[^0-9]/g, '') })}
+                              onChange={(e) => setEditUserForm({ ...editUserForm, bkashNo: formatBanglaPhoneNumber(e.target.value) })}
                               className="w-full bg-zinc-900 border border-zinc-805 rounded-lg py-1.5 px-3 text-xs text-white font-mono focus:outline-none focus:border-pink-500"
                             />
                           </div>
@@ -2295,7 +2438,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                               type="text"
                               maxLength={11}
                               value={editUserForm.nagadNo}
-                              onChange={(e) => setEditUserForm({ ...editUserForm, nagadNo: e.target.value.replace(/[^0-9]/g, '') })}
+                              onChange={(e) => setEditUserForm({ ...editUserForm, nagadNo: formatBanglaPhoneNumber(e.target.value) })}
                               className="w-full bg-zinc-900 border border-zinc-805 rounded-lg py-1.5 px-3 text-xs text-white font-mono focus:outline-none focus:border-orange-500"
                             />
                           </div>
@@ -2409,6 +2552,123 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                       </button>
                     </div>
                   </div>
+                )}
+                
+                {/* Sub Tab: Admin Notes */}
+                {userSubTab === 'admin_notes' && (
+                  <form onSubmit={handleUpdateAdminNotes} className="flex flex-col gap-3.5 mt-1">
+                    {/* Information Alert */}
+                    <div className="p-3 bg-[#161412] border border-[#c5a059]/15 rounded-xl flex gap-2.5">
+                      <ShieldCheck className="w-5 h-5 text-[#c5a059] shrink-0 mt-0.5" />
+                      <div>
+                        <span className="text-[10.5px] font-bold text-[#dfc187] block mb-0.5">ব্যক্তিগত ট্র্যাকিং ও অ্যাডমিন নোটস</span>
+                        <span className="text-[9.5px] text-zinc-400 block leading-normal">
+                          এই তথ্যগুলো শুধুমাত্র আপনার ব্যক্তিগত কাজের সুবিধার জন্য। গ্রাহক নিজের প্রোফাইলে এই ডাটাগুলো দেখতে পারবে না এবং তার আসল রেজিস্ট্রেশন তথ্যে কোনো পরিবর্তন আসবে না।
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 bg-zinc-950/40 border border-zinc-900/60 rounded-xl flex flex-col gap-3 font-sans">
+                      {/* 1. WhatsApp Number */}
+                      <div>
+                        <label className="text-[10px] text-zinc-400 block mb-1 font-semibold">সহজে যোগাযোগ করার নাম্বার</label>
+                        <div className="flex items-center gap-2">
+                          <div className="relative flex-1">
+                            <input
+                              type="tel"
+                              placeholder="সহজে যোগাযোগ করার নাম্বার"
+                              maxLength={11}
+                              value={adminNotesForm.adminWhatsapp}
+                              onChange={(e) => setAdminNotesForm({ ...adminNotesForm, adminWhatsapp: formatBanglaPhoneNumber(e.target.value) })}
+                              className="bg-zinc-900 text-zinc-200 border border-zinc-850 rounded-lg text-xs py-2 pl-3 pr-14 w-full focus:outline-none focus:border-[#c5a059]/40 font-mono"
+                            />
+                            {adminNotesForm.adminWhatsapp.trim() !== (selectedUser.phone || '').trim() && (
+                              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-amber-500 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded select-none animate-pulse">
+                                Edited
+                              </span>
+                            )}
+                          </div>
+                          <a 
+                            href={`https://wa.me/${adminNotesForm.adminWhatsapp.startsWith('0') ? '88' + adminNotesForm.adminWhatsapp : adminNotesForm.adminWhatsapp}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="bg-[#25D366] hover:bg-[#20ba59] text-white p-2.5 rounded-lg text-xs flex items-center justify-center transition-colors h-[34px] w-[34px] shrink-0"
+                            title="হোয়াটসঅ্যাপ চ্যাট ওপেন করুন"
+                          >
+                            <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.665.988 3.3 1.488 5.36 1.489 5.517 0 10.003-4.482 10.006-9.997.001-2.672-1.03-5.185-2.906-7.062C17.233 1.707 14.73 1.665 12.01 1.665c-5.518 0-10.002 4.483-10.006 10c-.001 2.11.561 4.15 1.63 5.932l-.994 3.633 3.73-.976z"/>
+                            </svg>
+                          </a>
+                        </div>
+                      </div>
+
+                      {/* 2. Admin SIM */}
+                      <div>
+                        <label className="text-[10px] text-zinc-400 block mb-1 font-semibold">কোন সিম দ্বারা অ্যাক্সেস (সিম ট্র্যাকিং)</label>
+                        <input
+                          type="tel"
+                          placeholder="যেমন: 01712345678"
+                          maxLength={11}
+                          value={adminNotesForm.adminSim}
+                          onChange={(e) => setAdminNotesForm({ ...adminNotesForm, adminSim: formatBanglaPhoneNumber(e.target.value) })}
+                          className="w-full bg-zinc-900 text-zinc-200 border border-zinc-850 rounded-lg text-xs py-2 px-3 focus:outline-none focus:border-[#c5a059]/40 font-mono"
+                        />
+                      </div>
+
+                      {/* 3. Disbursement Preference */}
+                      <div>
+                        <label className="text-[10px] text-zinc-400 block mb-1 font-semibold">কোন নাম্বারে ও মেথডে লোন দিবেন</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          <select
+                            value={adminNotesForm.adminDisburseMethod}
+                            onChange={(e) => setAdminNotesForm({ ...adminNotesForm, adminDisburseMethod: e.target.value })}
+                            className="bg-zinc-900 text-zinc-200 border border-zinc-850 rounded-lg text-xs py-2 px-1 focus:outline-none focus:border-[#c5a059]/40"
+                          >
+                            <option value="bkash">bKash</option>
+                            <option value="nagad">Nagad</option>
+                            <option value="rocket">Rocket</option>
+                            <option value="bank">Bank</option>
+                          </select>
+                          <input
+                            type="tel"
+                            placeholder="মোবাইল/ব্যাংক একাউন্ট নম্বর"
+                            maxLength={adminNotesForm.adminDisburseMethod === 'bank' ? 25 : 11}
+                            value={adminNotesForm.adminDisburseNumber}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const isBank = adminNotesForm.adminDisburseMethod === 'bank';
+                              setAdminNotesForm({
+                                ...adminNotesForm,
+                                adminDisburseNumber: isBank ? val : formatBanglaPhoneNumber(val)
+                              });
+                            }}
+                            className="col-span-2 bg-zinc-900 text-zinc-200 border border-zinc-850 rounded-lg text-xs py-2 px-3 focus:outline-none focus:border-[#c5a059]/40 font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      {/* 4. Notes Textarea */}
+                      <div>
+                        <label className="text-[10px] text-zinc-400 block mb-1 font-semibold">অন্যান্য অ্যাডমিন নোটস</label>
+                        <textarea
+                          placeholder="গ্রাহক সম্পর্কে আপনার যেকোনো মন্তব্য বা নোট এখানে লিখে রাখুন..."
+                          value={adminNotesForm.adminNotesText}
+                          onChange={(e) => setAdminNotesForm({ ...adminNotesForm, adminNotesText: e.target.value })}
+                          className="w-full bg-zinc-900 text-zinc-200 border border-zinc-850 rounded-lg text-xs py-2 px-3 focus:outline-none focus:border-[#c5a059]/40 h-18 resize-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Submit Button */}
+                    <button
+                      type="submit"
+                      disabled={actionLoading}
+                      className="w-full py-2.5 bg-[#c5a059] hover:bg-[#dfc187] text-zinc-950 font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      <span>{actionLoading ? 'সংরক্ষণ করা হচ্ছে...' : 'অ্যাডমিন নোটস সংরক্ষণ করুন'}</span>
+                    </button>
+                  </form>
                 )}
 
                 {/* Sub Tab: Transactions */}
@@ -3260,14 +3520,21 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                     <div key={loan.id} className="p-4 flex flex-col gap-3 hover:bg-zinc-900/10">
                       
                       <div className="flex justify-between items-start">
-                        <div className="flex items-center gap-2.5">
+                        <div 
+                          onClick={() => {
+                            setActiveTab('users');
+                            selectUserAndSubTab(u, 'profile');
+                          }}
+                          className="flex items-center gap-2.5 cursor-pointer group"
+                          title="গ্রাহকের প্রোফাইল দেখতে ক্লিক করুন"
+                        >
                           <img
                             src={u.avatarUrl}
                             alt="Applicant"
-                            className="w-8 h-8 rounded-full border border-zinc-850 object-cover"
+                            className="w-8 h-8 rounded-full border border-zinc-850 object-cover group-hover:border-[#c5a059]/40 transition-colors"
                           />
                           <div>
-                            <h5 className="text-xs font-bold text-white font-sans">{u.name}</h5>
+                            <h5 className="text-xs font-bold text-white font-sans group-hover:text-[#c5a059] group-hover:underline transition-colors">{u.name}</h5>
                             <p className="text-[9px] text-zinc-500">মোবাইল: {toBanglaDigits(u.phone)} | এনআইডি ভেরিফাইড</p>
                           </div>
                         </div>
@@ -3278,22 +3545,106 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                       </div>
 
                       {/* Loan request particulars */}
-                      <div className="bg-zinc-950/40 border border-zinc-900 rounded-xl p-3 grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-sans">
-                        <div>
-                          <span className="text-[9px] text-zinc-500 block">ঋণের ধরণ</span>
-                          <span className="font-bold text-[#dfc187] text-[11px]">{loan.categoryBangla}</span>
+                      <div className="relative group/loanbox">
+                        <div 
+                          onClick={() => {
+                            const messageText = `গ্রাহক ${u.name || ''},\nআপনার ঋণের বিবরণ নিম্নরূপ:\n\nঋণের ধরণ: ${loan.categoryBangla}\nআবেদনের পরিমাণ: ৳ ${toBanglaDigits(loan.amount.toLocaleString())}\nমেয়াদ: ${toBanglaDigits(loan.months)} মাস\nসুদের হার: ${toBanglaDigits(loan.interestRate)}%\nমাসিক কিস্তি (EMI): ৳ ${toBanglaDigits(loan.emiAmount.toLocaleString())}\n\nধন্যবাদ,\n${systemSetting.appName || 'ন্যানো-ফাইন্যান্স'}`;
+                            navigator.clipboard.writeText(messageText);
+                            handleCopyField(loan.id, 'all-details', messageText);
+                          }}
+                          className="bg-zinc-950/40 border border-zinc-900 hover:border-[#c5a059]/40 hover:bg-zinc-950/60 rounded-xl p-3 grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-sans cursor-pointer transition-all duration-200 relative"
+                          title="মেসেজ কপি করতে ক্লিক করুন"
+                        >
+                          <div>
+                            <span className="text-[9px] text-zinc-500 block">ঋণের ধরণ</span>
+                            <span className="font-bold text-[#dfc187] text-[11px]">{loan.categoryBangla}</span>
+                          </div>
+                          <div>
+                            <span className="text-[9px] text-zinc-500 block">আবেদনের পরিমাণ</span>
+                            <span className="font-bold text-zinc-200 font-mono">৳ {toBanglaDigits(loan.amount.toLocaleString())}</span>
+                          </div>
+                          <div>
+                            <span className="text-[9px] text-zinc-500 block">মেয়াদ ও সুদের হার</span>
+                            <span className="font-bold text-zinc-300 font-sans">{toBanglaDigits(loan.months)} মাস ({toBanglaDigits(loan.interestRate)}%)</span>
+                          </div>
+                          <div className="relative">
+                            <span className="text-[9px] text-zinc-500 block">মাসিক কিস্তি (EMI)</span>
+                            <span className="font-bold text-zinc-200 font-mono flex items-center gap-1.5">
+                              ৳ {toBanglaDigits(loan.emiAmount.toLocaleString())}
+                              {copiedId === `${loan.id}-all-details` ? (
+                                <span className="text-[9px] text-emerald-400 bg-emerald-950/30 px-1.5 py-0.5 rounded border border-emerald-900/30 animate-pulse font-sans">কপি হয়েছে!</span>
+                              ) : (
+                                <span className="text-[8px] text-[#c5a059]/70 bg-[#c5a059]/5 border border-[#c5a059]/10 px-1 py-0.2 rounded opacity-0 group-hover/loanbox:opacity-100 transition-opacity duration-200 font-sans">কপি করুন</span>
+                              )}
+                            </span>
+                          </div>
                         </div>
-                        <div>
-                          <span className="text-[9px] text-zinc-500 block">আবেদনের পরিমাণ</span>
-                          <span className="font-bold text-zinc-200 font-mono">৳ {toBanglaDigits(loan.amount.toLocaleString())}</span>
+                      </div>
+
+                      {/* Admin Setup details box */}
+                      <div className="bg-zinc-950/40 border border-zinc-900 rounded-xl grid grid-cols-3 divide-x divide-zinc-900 text-xs font-sans">
+                        {u.adminWhatsapp || u.phone ? (
+                          <a 
+                            href={`https://wa.me/${(u.adminWhatsapp || u.phone || '').trim().startsWith('0') ? '88' + (u.adminWhatsapp || u.phone || '').trim() : (u.adminWhatsapp || u.phone || '').trim()}`}
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="p-3 hover:bg-zinc-900/30 transition-all duration-200 group/wa flex flex-col justify-center rounded-l-xl"
+                          >
+                            <div>
+                              <span className="text-[9px] text-zinc-500 block mb-0.5">হোয়াটসঅ্যাপ নম্বর</span>
+                              <span className="font-bold text-[#dfc187] text-[11px] font-mono block truncate">{toBanglaDigits(u.adminWhatsapp || u.phone || 'উল্লেখ নেই')}</span>
+                            </div>
+                          </a>
+                        ) : (
+                          <div className="p-3 flex flex-col justify-center rounded-l-xl">
+                            <div>
+                              <span className="text-[9px] text-zinc-500 block mb-0.5">হোয়াটসঅ্যাপ নম্বর</span>
+                              <span className="font-bold text-zinc-500 text-[11px] font-mono block">উল্লেখ নেই</span>
+                            </div>
+                          </div>
+                        )}
+
+                        <div 
+                          onClick={() => u.adminSim && handleCopyField(loan.id, 'admin-sim', u.adminSim)}
+                          className={`p-3 transition-all duration-200 flex flex-col justify-between group/sim ${u.adminSim ? 'cursor-pointer hover:bg-zinc-900/30' : ''}`}
+                        >
+                          <div>
+                            <span className="text-[9px] text-zinc-500 block mb-0.5">সিমে এক্সেস</span>
+                            <span className="font-bold text-zinc-300 font-sans block truncate">{toBanglaDigits(u.adminSim || 'উল্লেখ নেই')}</span>
+                          </div>
+                          {copiedId === `${loan.id}-admin-sim` && (
+                            <span className="text-[8px] mt-1 text-emerald-400 font-bold block animate-pulse">কপি হয়েছে!</span>
+                          )}
                         </div>
-                        <div>
-                          <span className="text-[9px] text-zinc-500 block">মেয়াদ ও সুদের হার</span>
-                          <span className="font-bold text-zinc-300 font-sans">{toBanglaDigits(loan.months)} মাস ({toBanglaDigits(loan.interestRate)}%)</span>
-                        </div>
-                        <div>
-                          <span className="text-[9px] text-zinc-500 block">মাসিক কিস্তি (EMI)</span>
-                          <span className="font-bold text-zinc-200 font-mono">৳ {toBanglaDigits(loan.emiAmount.toLocaleString())}</span>
+
+                        <div 
+                          onClick={() => {
+                            if (!u.adminDisburseNumber) return;
+                            const methodText = u.adminDisburseMethod === 'bkash' ? 'বিকাশ' : 
+                                               u.adminDisburseMethod === 'nagad' ? 'নগদ' : 
+                                               u.adminDisburseMethod === 'rocket' ? 'রকেট' : 
+                                               u.adminDisburseMethod === 'bank' ? 'ব্যাংক' : 
+                                               (u.adminDisburseMethod || 'বিকাশ');
+                            const messageTemplate = `✅ আপনার লোন আবেদন গ্রহণ করা হয়েছে।\nলোন গ্রহণের জন্য আপনার ${methodText} অ্যাকাউন্ট ${u.adminDisburseNumber} নিবন্ধিত করা হয়েছে।\nঅনুগ্রহ করে এই অ্যাকাউন্টটি সচল রাখুন।`;
+                            handleCopyField(loan.id, 'disburse-num', messageTemplate);
+                          }}
+                          className={`p-3 transition-all duration-200 flex flex-col justify-between group/disburse rounded-r-xl ${u.adminDisburseNumber ? 'cursor-pointer hover:bg-zinc-900/30' : ''}`}
+                        >
+                          <div>
+                            <span className="text-[9px] text-zinc-500 block mb-0.5">
+                              {u.adminDisburseMethod === 'bkash' ? 'বিকাশ নম্বর' : 
+                               u.adminDisburseMethod === 'nagad' ? 'নগদ নম্বর' : 
+                               u.adminDisburseMethod === 'rocket' ? 'রকেট নম্বর' : 
+                               u.adminDisburseMethod === 'bank' ? 'ব্যাংক নম্বর' : 
+                               `${u.adminDisburseMethod || 'বিকাশ'} নম্বর`}
+                            </span>
+                            <span className="font-bold text-zinc-200 font-mono block truncate">
+                              {toBanglaDigits(u.adminDisburseNumber || 'উল্লেখ নেই')}
+                            </span>
+                          </div>
+                          {copiedId === `${loan.id}-disburse-num` && (
+                            <span className="text-[8px] mt-1 text-emerald-400 font-bold block animate-pulse">কপি হয়েছে!</span>
+                          )}
                         </div>
                       </div>
 
@@ -3304,7 +3655,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                           <span className="text-[10.5px] font-bold text-zinc-300 uppercase tracking-tight">আবেদনকারীর আপলোডকৃত নথিসমূহ ও প্রমাণপত্র</span>
                         </div>
 
-                        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                           {/* 1. Applicant Selfie */}
                           <div className="bg-zinc-900/40 p-2 border border-zinc-900 rounded-lg flex flex-col gap-1.5 items-center">
                             <span className="text-[9.5px] font-bold text-zinc-400">১. আবেদনকারীর সেলফি</span>
@@ -3377,33 +3728,9 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                             </span>
                           </div>
 
-                          {/* 4. Income Proof info */}
+                          {/* 4. Address proof info */}
                           <div className="bg-zinc-900/40 p-2 border border-zinc-900 rounded-lg flex flex-col gap-1.5 items-center">
-                            <span className="text-[9.5px] font-bold text-zinc-400">৪. আয়ের উৎস প্রমাণ</span>
-                            <div 
-                              onClick={() => {
-                                const url = loan.incomeProofUrl || "https://images.unsplash.com/photo-1450133064473-71024230f91b?auto=format&fit=crop&q=80&w=350";
-                                setPreviewDocUrl(url);
-                                setPreviewDocTitle(`${u.name} - আয়ের উৎস প্রমাণ`);
-                              }}
-                              className="w-full aspect-[4/3] rounded overflow-hidden border border-zinc-850 hover:border-[#c5a059]/50 bg-zinc-950/80 flex items-center justify-center cursor-pointer hover:shadow-lg hover:shadow-[#c5a059]/5 transition-all duration-200 group"
-                              title="ক্লিক করে বড় করে দেখুন"
-                            >
-                              <img 
-                                src={loan.incomeProofUrl || "https://images.unsplash.com/photo-1450133064473-71024230f91b?auto=format&fit=crop&q=80&w=350"} 
-                                alt="Income Proof" 
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                referrerPolicy="no-referrer"
-                              />
-                            </div>
-                            <span className="text-[8.5px] text-[#dfc187] font-semibold text-center mt-0.5 block">
-                              কর্মসংস্থান ও বেতন স্টেটমেন্ট
-                            </span>
-                          </div>
-
-                          {/* 5. Address proof info */}
-                          <div className="bg-zinc-900/40 p-2 border border-zinc-900 rounded-lg flex flex-col gap-1.5 items-center">
-                            <span className="text-[9.5px] font-bold text-zinc-400">৫. ঠিকানার প্রমাণ কপি</span>
+                            <span className="text-[9.5px] font-bold text-zinc-400">৪. ঠিকানার প্রমাণ কপি</span>
                             <div 
                               onClick={() => {
                                 const url = loan.addressProofUrl || "https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=350";
@@ -3445,6 +3772,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                             <span className="text-zinc-500">আবেদনের তারিখ সময়:</span> <span className="text-zinc-300 ml-1 font-mono">{toBanglaDigits(loan.date || '০৯ জুন, ২০২৬')}{getLoanRelativeTimeLabel(loan.createdAt)}</span>
                           </div>
                         </div>
+
                       </div>
 
                       {/* Approve / Reject Controls */}
@@ -3483,23 +3811,85 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                   কোনো বিতরণকৃত ঋণ বর্তমানে সক্রিয় নেই।
                 </div>
               ) : (
-                <div className="divide-y divide-zinc-900 max-h-[250px] overflow-y-auto no-scrollbar">
-                  {activeLoans.map(({ user: u, loan }) => (
-                    <div key={loan.id} className="p-3 flex items-center justify-between text-xs hover:bg-zinc-900/10">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-zinc-200 font-sans">{u.name}</span>
-                          <span className="text-[9px] bg-emerald-950/10 text-emerald-400 font-mono scale-90 border border-emerald-900/10 px-1 py-0.2 rounded">APPROVED</span>
-                        </div>
-                        <p className="text-[10px] text-zinc-500 font-sans mt-0.5">{loan.categoryBangla} | আইডি: {loan.id} | পরিশোধিত কিস্তি: {toBanglaDigits(loan.repaidCount)}/{toBanglaDigits(loan.totalInstallments)}</p>
-                      </div>
+                <div className="divide-y divide-zinc-900 max-h-[450px] overflow-y-auto no-scrollbar">
+                  {activeLoans.map(({ user: u, loan }) => {
+                    const isExpanded = expandedLoanId === loan.id;
+                    return (
+                      <div key={loan.id} className="p-3 flex flex-col gap-2 hover:bg-zinc-900/5">
+                        <div 
+                          onClick={() => setExpandedLoanId(isExpanded ? null : loan.id)}
+                          className="flex items-center justify-between text-xs cursor-pointer select-none"
+                        >
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveTab('users');
+                                  selectUserAndSubTab(u, 'profile');
+                                }}
+                                className="font-bold text-zinc-200 font-sans hover:text-[#c5a059] hover:underline cursor-pointer"
+                                title="গ্রাহকের প্রোফাইল দেখতে ক্লিক করুন"
+                              >
+                                {u.name}
+                              </span>
+                              <span className="text-[9px] bg-emerald-950/10 text-emerald-400 font-mono scale-90 border border-emerald-900/10 px-1 py-0.2 rounded">APPROVED</span>
+                              {loan.adminSim && (
+                                <span className="text-[8px] bg-zinc-800 text-amber-400 font-sans px-1 rounded border border-zinc-700">সিমে এক্সেস: {loan.adminSim}</span>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-zinc-500 font-sans mt-0.5">{loan.categoryBangla} | আইডি: {loan.id} | পরিশোধিত কিস্তি: {toBanglaDigits(loan.repaidCount)}/{toBanglaDigits(loan.totalInstallments)}</p>
+                          </div>
 
-                      <div className="text-right">
-                        <span className="font-bold text-white font-mono">৳ {toBanglaDigits(loan.amount.toLocaleString())}</span>
-                        <p className="text-[9px] text-zinc-500 font-sans mt-0.5">বিতরণকৃত ফান্ড</p>
+                          <div className="flex items-center gap-3">
+                            <div className="text-right">
+                              <span className="font-bold text-white font-mono">৳ {toBanglaDigits(loan.amount.toLocaleString())}</span>
+                              <p className="text-[9px] text-zinc-500 font-sans mt-0.5">বিতরণকৃত ফান্ড</p>
+                            </div>
+                            {isExpanded ? (
+                              <ChevronUp className="w-4 h-4 text-zinc-500" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4 text-zinc-500" />
+                            )}
+                          </div>
+                        </div>
+
+                        {isExpanded && (
+                          <div className="mt-2 bg-zinc-950/40 border border-zinc-900 rounded-xl p-3 flex flex-col gap-3 transition-all">
+                            {/* Profile View in brief */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 text-[10px] font-sans border-b border-zinc-900 pb-2 text-zinc-400">
+                              <div>
+                                <span className="text-zinc-500 block">আবেদনকারী:</span>
+                                <span 
+                                  onClick={() => {
+                                    setSelectedUser(u);
+                                    setActiveTab('users');
+                                    setUserSubTab('profile');
+                                  }}
+                                  className="text-zinc-200 font-medium hover:text-[#c5a059] hover:underline cursor-pointer"
+                                  title="গ্রাহকের প্রোফাইল দেখতে ক্লিক করুন"
+                                >
+                                  {u.name} ({toBanglaDigits(u.phone)})
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-zinc-500 block">ঠিকানা:</span>
+                                <span className="text-zinc-300 font-medium truncate" title={u.currentAddress}>{u.currentAddress || 'উল্লেখ নেই'}</span>
+                              </div>
+                              <div>
+                                <span className="text-zinc-500 block">বিকাশ/নগদ (ব্যবহারকারী):</span>
+                                <span className="text-zinc-300 font-medium">বিকাশ: {u.bkashNo || 'নেই'} | নগদ: {u.nagadNo || 'নেই'}</span>
+                              </div>
+                              <div>
+                                <span className="text-zinc-500 block">আবেদনের তারিখ:</span>
+                                <span className="text-zinc-300 font-medium">{loan.date}</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -3585,7 +3975,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                           maxLength={11}
                           disabled={subAdminForm.isEditing}
                           value={subAdminForm.phone}
-                          onChange={(e) => setSubAdminForm({ ...subAdminForm, phone: e.target.value.replace(/[^0-9]/g, '') })}
+                          onChange={(e) => setSubAdminForm({ ...subAdminForm, phone: formatBanglaPhoneNumber(e.target.value) })}
                           placeholder="01XXXXXXXXX"
                           className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 px-3 text-xs text-zinc-200 font-mono focus:outline-none disabled:opacity-40"
                         />
@@ -3960,7 +4350,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                     required
                     maxLength={11}
                     value={settingsForm.bkashNumber}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, bkashNumber: e.target.value.replace(/[^0-9]/g, '') })}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, bkashNumber: formatBanglaPhoneNumber(e.target.value) })}
                     className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2.5 px-3 text-xs text-zinc-200 font-mono focus:outline-none"
                   />
                 </div>
@@ -3971,7 +4361,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                     required
                     maxLength={11}
                     value={settingsForm.nagadNumber}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, nagadNumber: e.target.value.replace(/[^0-9]/g, '') })}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, nagadNumber: formatBanglaPhoneNumber(e.target.value) })}
                     className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2.5 px-3 text-xs text-zinc-200 font-mono focus:outline-none"
                   />
                 </div>
@@ -4273,7 +4663,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                       required
                       maxLength={11}
                       value={createUserForm.phone}
-                      onChange={(e) => setCreateUserForm({ ...createUserForm, phone: e.target.value.replace(/[^0-9]/g, '') })}
+                      onChange={(e) => setCreateUserForm({ ...createUserForm, phone: formatBanglaPhoneNumber(e.target.value) })}
                       placeholder="যেমন: 01712345678"
                       className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2.5 px-3 text-xs text-white font-mono focus:outline-none focus:border-[#c5a059]/40"
                     />

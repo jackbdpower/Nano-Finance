@@ -2717,7 +2717,21 @@ app.post("/api/admin/user/create", (req, res) => {
 
 // Admin API: Update user's verified status, adjust balance, name, phone, PIN or delete user
 app.post("/api/admin/user/update", async (req, res) => {
-  const { adminPhone, userPhone, isVerified, savingsBalance, isDelete, name, newPhone, pin } = req.body;
+  const { 
+    adminPhone, 
+    userPhone, 
+    isVerified, 
+    savingsBalance, 
+    isDelete, 
+    name, 
+    newPhone, 
+    pin,
+    adminSim,
+    adminDisburseNumber,
+    adminDisburseMethod,
+    adminNotesText,
+    adminWhatsapp
+  } = req.body;
   if (!adminPhone || !userPhone) {
     return res.status(400).json({ error: "অ্যাডমিন ও গ্রাহকের মোবাইল নম্বর প্রয়োজন।" });
   }
@@ -2752,6 +2766,22 @@ app.post("/api/admin/user/update", async (req, res) => {
     // Edit customer general profile details
     if (name) {
       db.users[userIdx].name = name.trim();
+    }
+
+    if (adminSim !== undefined) {
+      db.users[userIdx].adminSim = adminSim;
+    }
+    if (adminDisburseNumber !== undefined) {
+      db.users[userIdx].adminDisburseNumber = adminDisburseNumber;
+    }
+    if (adminDisburseMethod !== undefined) {
+      db.users[userIdx].adminDisburseMethod = adminDisburseMethod;
+    }
+    if (adminNotesText !== undefined) {
+      db.users[userIdx].adminNotesText = adminNotesText;
+    }
+    if (adminWhatsapp !== undefined) {
+      db.users[userIdx].adminWhatsapp = adminWhatsapp;
     }
 
     if (req.body.bkashNo !== undefined) {
@@ -2912,7 +2942,25 @@ app.post("/api/admin/user/transaction/update", (req, res) => {
 
 // Admin API: Add, edit, delete user Loans and EMI installments
 app.post("/api/admin/user/loan/update", async (req, res) => {
-  const { adminPhone, userPhone, loanId, action, category, amount, months, status, repaidCount, totalInstallments, emiInstallments } = req.body;
+  const { 
+    adminPhone, 
+    userPhone, 
+    loanId, 
+    action, 
+    category, 
+    amount, 
+    months, 
+    status, 
+    repaidCount, 
+    totalInstallments, 
+    emiInstallments,
+    adminSim,
+    adminDisburseNumber,
+    adminDisburseMethod,
+    adminNotesText,
+    adminWhatsapp
+  } = req.body;
+
   if (!adminPhone || !userPhone) {
     return res.status(400).json({ error: "প্যারামিটার ফিল্ড মিসিং।" });
   }
@@ -2977,7 +3025,12 @@ app.post("/api/admin/user/loan/update", async (req, res) => {
           months: months !== undefined ? Number(months) : l.months,
           status: status || l.status,
           repaidCount: repaidCount !== undefined ? Number(repaidCount) : l.repaidCount,
-          totalInstallments: totalInstallments !== undefined ? Number(totalInstallments) : l.totalInstallments
+          totalInstallments: totalInstallments !== undefined ? Number(totalInstallments) : l.totalInstallments,
+          adminSim: adminSim !== undefined ? adminSim : l.adminSim,
+          adminDisburseNumber: adminDisburseNumber !== undefined ? adminDisburseNumber : l.adminDisburseNumber,
+          adminDisburseMethod: adminDisburseMethod !== undefined ? adminDisburseMethod : l.adminDisburseMethod,
+          adminNotesText: adminNotesText !== undefined ? adminNotesText : l.adminNotesText,
+          adminWhatsapp: adminWhatsapp !== undefined ? adminWhatsapp : l.adminWhatsapp
         };
       }
       return l;
