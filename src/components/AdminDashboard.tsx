@@ -192,7 +192,13 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
     maxLoanMonths: 18,
     loanMonthPresets: '3, 6, 9, 12',
     requireMinSavingsForLoan: false,
-    minSavingsForLoanAmount: 500
+    minSavingsForLoanAmount: 500,
+    regFieldGender: true,
+    regFieldDob: true,
+    regFieldEmail: true,
+    regFieldCurrentAddress: true,
+    regFieldPermanentAddress: true,
+    regFieldMfs: true
   });
 
   // User details adjustment modal
@@ -330,7 +336,13 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
           maxLoanMonths: data.settings.maxLoanMonths !== undefined ? data.settings.maxLoanMonths : 18,
           loanMonthPresets: data.settings.loanMonthPresets !== undefined ? data.settings.loanMonthPresets : "3, 6, 9, 12",
           requireMinSavingsForLoan: data.settings.requireMinSavingsForLoan !== undefined ? !!data.settings.requireMinSavingsForLoan : false,
-          minSavingsForLoanAmount: data.settings.minSavingsForLoanAmount !== undefined ? Number(data.settings.minSavingsForLoanAmount) : 500
+          minSavingsForLoanAmount: data.settings.minSavingsForLoanAmount !== undefined ? Number(data.settings.minSavingsForLoanAmount) : 500,
+          regFieldGender: data.settings.regFieldGender !== undefined ? !!data.settings.regFieldGender : true,
+          regFieldDob: data.settings.regFieldDob !== undefined ? !!data.settings.regFieldDob : true,
+          regFieldEmail: data.settings.regFieldEmail !== undefined ? !!data.settings.regFieldEmail : true,
+          regFieldCurrentAddress: data.settings.regFieldCurrentAddress !== undefined ? !!data.settings.regFieldCurrentAddress : true,
+          regFieldPermanentAddress: data.settings.regFieldPermanentAddress !== undefined ? !!data.settings.regFieldPermanentAddress : true,
+          regFieldMfs: data.settings.regFieldMfs !== undefined ? !!data.settings.regFieldMfs : true
         });
         setUsers(data.users || []);
         setSubAdmins(data.subAdmins || []);
@@ -1369,7 +1381,8 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
   const selectUserAndSubTab = (user: any, tab: 'profile' | 'admin_notes' | 'transactions' | 'loans' | 'logs') => {
     setSelectedUser(user);
     setAdjustBalanceVal(Number(user.savingsBalance || 0));
-    setUserSubTab(tab);
+    const targetTab = operator?.role !== 'main_admin' && tab === 'admin_notes' ? 'profile' : tab;
+    setUserSubTab(targetTab);
     
     // Always initialize adminNotesForm regardless of tab
     setAdminNotesForm({
@@ -1380,7 +1393,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
       adminWhatsapp: user.adminWhatsapp || user.phone
     });
 
-    if (tab === 'profile') {
+    if (targetTab === 'profile') {
       setEditUserForm({
         name: user.name,
         phone: user.phone,
@@ -2265,7 +2278,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                 <div className="flex border-b border-zinc-900 pb-2 overflow-x-auto gap-1 no-scrollbar">
                   {[
                     { id: 'profile', label: 'প্রোফাইল সংশোধন', icon: <UserIcon className="w-3.5 h-3.5" /> },
-                    { id: 'admin_notes', label: 'এডমিন নোট', icon: <FileText className="w-3.5 h-3.5" /> },
+                    ...(operator?.role === 'main_admin' ? [{ id: 'admin_notes', label: 'এডমিন নোট', icon: <FileText className="w-3.5 h-3.5" /> }] : []),
                     { id: 'transactions', label: 'লেনদেন বিবরণী', icon: <CreditCard className="w-3.5 h-3.5" /> },
                     { id: 'loans', label: 'ঋণ খাতা', icon: <Landmark className="w-3.5 h-3.5" /> },
                     { id: 'logs', label: 'বিজ্ঞপ্তি ও লগ', icon: <Bell className="w-3.5 h-3.5" /> }
@@ -2555,7 +2568,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                 )}
                 
                 {/* Sub Tab: Admin Notes */}
-                {userSubTab === 'admin_notes' && (
+                {userSubTab === 'admin_notes' && operator?.role === 'main_admin' && (
                   <form onSubmit={handleUpdateAdminNotes} className="flex flex-col gap-3.5 mt-1">
                     {/* Information Alert */}
                     <div className="p-3 bg-[#161412] border border-[#c5a059]/15 rounded-xl flex gap-2.5">
@@ -3582,71 +3595,73 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                       </div>
 
                       {/* Admin Setup details box */}
-                      <div className="bg-zinc-950/40 border border-zinc-900 rounded-xl grid grid-cols-3 divide-x divide-zinc-900 text-xs font-sans">
-                        {u.adminWhatsapp || u.phone ? (
-                          <a 
-                            href={`https://wa.me/${(u.adminWhatsapp || u.phone || '').trim().startsWith('0') ? '88' + (u.adminWhatsapp || u.phone || '').trim() : (u.adminWhatsapp || u.phone || '').trim()}`}
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="p-3 hover:bg-zinc-900/30 transition-all duration-200 group/wa flex flex-col justify-center rounded-l-xl"
+                      {operator?.role === 'main_admin' && (
+                        <div className="bg-zinc-950/40 border border-zinc-900 rounded-xl grid grid-cols-3 divide-x divide-zinc-900 text-xs font-sans">
+                          {u.adminWhatsapp || u.phone ? (
+                            <a 
+                              href={`https://wa.me/${(u.adminWhatsapp || u.phone || '').trim().startsWith('0') ? '88' + (u.adminWhatsapp || u.phone || '').trim() : (u.adminWhatsapp || u.phone || '').trim()}`}
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="p-3 hover:bg-zinc-900/30 transition-all duration-200 group/wa flex flex-col justify-center rounded-l-xl"
+                            >
+                              <div>
+                                <span className="text-[9px] text-zinc-500 block mb-0.5">হোয়াটসঅ্যাপ নম্বর</span>
+                                <span className="font-bold text-[#dfc187] text-[11px] font-mono block truncate">{toBanglaDigits(u.adminWhatsapp || u.phone || 'উল্লেখ নেই')}</span>
+                              </div>
+                            </a>
+                          ) : (
+                            <div className="p-3 flex flex-col justify-center rounded-l-xl">
+                              <div>
+                                <span className="text-[9px] text-zinc-500 block mb-0.5">হোয়াটসঅ্যাপ নম্বর</span>
+                                <span className="font-bold text-zinc-500 text-[11px] font-mono block">উল্লেখ নেই</span>
+                              </div>
+                            </div>
+                          )}
+
+                          <div 
+                            onClick={() => u.adminSim && handleCopyField(loan.id, 'admin-sim', u.adminSim)}
+                            className={`p-3 transition-all duration-200 flex flex-col justify-between group/sim ${u.adminSim ? 'cursor-pointer hover:bg-zinc-900/30' : ''}`}
                           >
                             <div>
-                              <span className="text-[9px] text-zinc-500 block mb-0.5">হোয়াটসঅ্যাপ নম্বর</span>
-                              <span className="font-bold text-[#dfc187] text-[11px] font-mono block truncate">{toBanglaDigits(u.adminWhatsapp || u.phone || 'উল্লেখ নেই')}</span>
+                              <span className="text-[9px] text-zinc-500 block mb-0.5">সিমে এক্সেস</span>
+                              <span className="font-bold text-zinc-300 font-sans block truncate">{toBanglaDigits(u.adminSim || 'উল্লেখ নেই')}</span>
                             </div>
-                          </a>
-                        ) : (
-                          <div className="p-3 flex flex-col justify-center rounded-l-xl">
+                            {copiedId === `${loan.id}-admin-sim` && (
+                              <span className="text-[8px] mt-1 text-emerald-400 font-bold block animate-pulse">কপি হয়েছে!</span>
+                            )}
+                          </div>
+
+                          <div 
+                            onClick={() => {
+                              if (!u.adminDisburseNumber) return;
+                              const methodText = u.adminDisburseMethod === 'bkash' ? 'বিকাশ' : 
+                                                 u.adminDisburseMethod === 'nagad' ? 'নগদ' : 
+                                                 u.adminDisburseMethod === 'rocket' ? 'রকেট' : 
+                                                 u.adminDisburseMethod === 'bank' ? 'ব্যাংক' : 
+                                                 (u.adminDisburseMethod || 'বিকাশ');
+                              const messageTemplate = `✅ আপনার লোন আবেদন গ্রহণ করা হয়েছে।\nলোন গ্রহণের জন্য আপনার ${methodText} অ্যাকাউন্ট ${u.adminDisburseNumber} নিবন্ধিত করা হয়েছে।\nঅনুগ্রহ করে এই অ্যাকাউন্টটি সচল রাখুন।`;
+                              handleCopyField(loan.id, 'disburse-num', messageTemplate);
+                            }}
+                            className={`p-3 transition-all duration-200 flex flex-col justify-between group/disburse rounded-r-xl ${u.adminDisburseNumber ? 'cursor-pointer hover:bg-zinc-900/30' : ''}`}
+                          >
                             <div>
-                              <span className="text-[9px] text-zinc-500 block mb-0.5">হোয়াটসঅ্যাপ নম্বর</span>
-                              <span className="font-bold text-zinc-500 text-[11px] font-mono block">উল্লেখ নেই</span>
+                              <span className="text-[9px] text-zinc-500 block mb-0.5">
+                                {u.adminDisburseMethod === 'bkash' ? 'বিকাশ নম্বর' : 
+                                 u.adminDisburseMethod === 'nagad' ? 'নগদ নম্বর' : 
+                                 u.adminDisburseMethod === 'rocket' ? 'রকেট নম্বর' : 
+                                 u.adminDisburseMethod === 'bank' ? 'ব্যাংক নম্বর' : 
+                                 `${u.adminDisburseMethod || 'বিকাশ'} নম্বর`}
+                              </span>
+                              <span className="font-bold text-zinc-200 font-mono block truncate">
+                                {toBanglaDigits(u.adminDisburseNumber || 'উল্লেখ নেই')}
+                              </span>
                             </div>
+                            {copiedId === `${loan.id}-disburse-num` && (
+                              <span className="text-[8px] mt-1 text-emerald-400 font-bold block animate-pulse">কপি হয়েছে!</span>
+                            )}
                           </div>
-                        )}
-
-                        <div 
-                          onClick={() => u.adminSim && handleCopyField(loan.id, 'admin-sim', u.adminSim)}
-                          className={`p-3 transition-all duration-200 flex flex-col justify-between group/sim ${u.adminSim ? 'cursor-pointer hover:bg-zinc-900/30' : ''}`}
-                        >
-                          <div>
-                            <span className="text-[9px] text-zinc-500 block mb-0.5">সিমে এক্সেস</span>
-                            <span className="font-bold text-zinc-300 font-sans block truncate">{toBanglaDigits(u.adminSim || 'উল্লেখ নেই')}</span>
-                          </div>
-                          {copiedId === `${loan.id}-admin-sim` && (
-                            <span className="text-[8px] mt-1 text-emerald-400 font-bold block animate-pulse">কপি হয়েছে!</span>
-                          )}
                         </div>
-
-                        <div 
-                          onClick={() => {
-                            if (!u.adminDisburseNumber) return;
-                            const methodText = u.adminDisburseMethod === 'bkash' ? 'বিকাশ' : 
-                                               u.adminDisburseMethod === 'nagad' ? 'নগদ' : 
-                                               u.adminDisburseMethod === 'rocket' ? 'রকেট' : 
-                                               u.adminDisburseMethod === 'bank' ? 'ব্যাংক' : 
-                                               (u.adminDisburseMethod || 'বিকাশ');
-                            const messageTemplate = `✅ আপনার লোন আবেদন গ্রহণ করা হয়েছে।\nলোন গ্রহণের জন্য আপনার ${methodText} অ্যাকাউন্ট ${u.adminDisburseNumber} নিবন্ধিত করা হয়েছে।\nঅনুগ্রহ করে এই অ্যাকাউন্টটি সচল রাখুন।`;
-                            handleCopyField(loan.id, 'disburse-num', messageTemplate);
-                          }}
-                          className={`p-3 transition-all duration-200 flex flex-col justify-between group/disburse rounded-r-xl ${u.adminDisburseNumber ? 'cursor-pointer hover:bg-zinc-900/30' : ''}`}
-                        >
-                          <div>
-                            <span className="text-[9px] text-zinc-500 block mb-0.5">
-                              {u.adminDisburseMethod === 'bkash' ? 'বিকাশ নম্বর' : 
-                               u.adminDisburseMethod === 'nagad' ? 'নগদ নম্বর' : 
-                               u.adminDisburseMethod === 'rocket' ? 'রকেট নম্বর' : 
-                               u.adminDisburseMethod === 'bank' ? 'ব্যাংক নম্বর' : 
-                               `${u.adminDisburseMethod || 'বিকাশ'} নম্বর`}
-                            </span>
-                            <span className="font-bold text-zinc-200 font-mono block truncate">
-                              {toBanglaDigits(u.adminDisburseNumber || 'উল্লেখ নেই')}
-                            </span>
-                          </div>
-                          {copiedId === `${loan.id}-disburse-num` && (
-                            <span className="text-[8px] mt-1 text-emerald-400 font-bold block animate-pulse">কপি হয়েছে!</span>
-                          )}
-                        </div>
-                      </div>
+                      )}
 
                       {/* Dynamic Uploaded Verification Dossier */}
                       <div className="border border-zinc-900/60 bg-zinc-950/40 rounded-xl p-3.5 flex flex-col gap-3 font-sans">
@@ -3834,7 +3849,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                                 {u.name}
                               </span>
                               <span className="text-[9px] bg-emerald-950/10 text-emerald-400 font-mono scale-90 border border-emerald-900/10 px-1 py-0.2 rounded">APPROVED</span>
-                              {loan.adminSim && (
+                              {loan.adminSim && operator?.role === 'main_admin' && (
                                 <span className="text-[8px] bg-zinc-800 text-amber-400 font-sans px-1 rounded border border-zinc-700">সিমে এক্সেস: {loan.adminSim}</span>
                               )}
                             </div>
@@ -4339,6 +4354,119 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                       />
                     </div>
                   )}
+                </div>
+              </div>
+
+              {/* Member Registration Form Fields Control */}
+              <div className="pt-3 mt-3 border-t border-dashed border-zinc-800/80">
+                <h5 className="text-[10px] font-bold text-[#c5a059] uppercase tracking-wider mb-2">
+                  নিবন্ধন ফর্মের ক্ষেত্রসমূহ নিয়ন্ত্রণ (Member Registration Fields Toggles)
+                </h5>
+                <span className="text-[9px] text-zinc-500 block mb-3 leading-relaxed">
+                  নিবন্ধন করার সময় কোন কোন তথ্যগুলো ইনপুট ফিল্ড হিসেবে থাকবে তা এখান থেকে অন/অফ করতে পারবেন। অফ করা ফিল্ডগুলো নিবন্ধনের সময় দেখাবে না এবং কোনো সমস্যা ছাড়াই একাউন্ট তৈরি করা যাবে।
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                  {/* Gender Field Toggle */}
+                  <div className="flex items-center justify-between bg-zinc-950/40 p-2.5 rounded-xl border border-zinc-900/60">
+                    <div>
+                      <span className="text-[10.5px] font-bold text-zinc-300 block">লিঙ্গ (Gender)</span>
+                      <span className="text-[8.5px] text-zinc-500 block">পুরুষ/মহিলা/অন্যান্য অপশন</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={settingsForm.regFieldGender}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, regFieldGender: e.target.checked })}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-zinc-400 after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#c5a059] peer-checked:after:bg-zinc-950"></div>
+                    </label>
+                  </div>
+
+                  {/* Date of Birth Field Toggle */}
+                  <div className="flex items-center justify-between bg-zinc-950/40 p-2.5 rounded-xl border border-zinc-900/60">
+                    <div>
+                      <span className="text-[10.5px] font-bold text-zinc-300 block">জন্ম তারিখ (Date of Birth)</span>
+                      <span className="text-[8.5px] text-zinc-500 block">ক্যালেন্ডার ডেট ইনপুট</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={settingsForm.regFieldDob}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, regFieldDob: e.target.checked })}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-zinc-400 after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#c5a059] peer-checked:after:bg-zinc-950"></div>
+                    </label>
+                  </div>
+
+                  {/* Email Field Toggle */}
+                  <div className="flex items-center justify-between bg-zinc-950/40 p-2.5 rounded-xl border border-zinc-900/60">
+                    <div>
+                      <span className="text-[10.5px] font-bold text-zinc-300 block">ইমেইল ঠিকানা (Email Address)</span>
+                      <span className="text-[8.5px] text-zinc-500 block">ঐচ্ছিক ইমেইল ইনপুট</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={settingsForm.regFieldEmail}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, regFieldEmail: e.target.checked })}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-zinc-400 after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#c5a059] peer-checked:after:bg-zinc-950"></div>
+                    </label>
+                  </div>
+
+                  {/* Current Address Field Toggle */}
+                  <div className="flex items-center justify-between bg-zinc-950/40 p-2.5 rounded-xl border border-zinc-900/60">
+                    <div>
+                      <span className="text-[10.5px] font-bold text-zinc-300 block">বর্তমান ঠিকানা (Current Address)</span>
+                      <span className="text-[8.5px] text-zinc-500 block">বর্তমান বাড়ির ঠিকানা</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={settingsForm.regFieldCurrentAddress}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, regFieldCurrentAddress: e.target.checked })}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-zinc-400 after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#c5a059] peer-checked:after:bg-zinc-950"></div>
+                    </label>
+                  </div>
+
+                  {/* Permanent Address Field Toggle */}
+                  <div className="flex items-center justify-between bg-zinc-950/40 p-2.5 rounded-xl border border-zinc-900/60">
+                    <div>
+                      <span className="text-[10.5px] font-bold text-zinc-300 block">স্থায়ী ঠিকানা (Permanent Address)</span>
+                      <span className="text-[8.5px] text-zinc-500 block">স্থায়ী গ্রামের ঠিকানা</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={settingsForm.regFieldPermanentAddress}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, regFieldPermanentAddress: e.target.checked })}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-zinc-400 after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#c5a059] peer-checked:after:bg-zinc-950"></div>
+                    </label>
+                  </div>
+
+                  {/* bKash/Nagad Wallet Field Toggle */}
+                  <div className="flex items-center justify-between bg-zinc-950/40 p-2.5 rounded-xl border border-zinc-900/60">
+                    <div>
+                      <span className="text-[10.5px] font-bold text-zinc-300 block">বিকাশ/নগদ ওয়ালেট (MFS Accounts)</span>
+                      <span className="text-[8.5px] text-zinc-500 block">বিকাশ ও নগদ ইনপুট ফিল্ড</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={settingsForm.regFieldMfs}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, regFieldMfs: e.target.checked })}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-zinc-400 after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#c5a059] peer-checked:after:bg-zinc-950"></div>
+                    </label>
+                  </div>
                 </div>
               </div>
 

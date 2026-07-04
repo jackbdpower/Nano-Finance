@@ -86,37 +86,39 @@ export default function LoginScreen({ onLoginSuccess, initialPhone = '', setting
       setErrorMsg('সঠিক ১১ ডিজিটের মোবাইল নম্বর প্রদান করুন (যেমন: 01xxxxxxxxx)');
       return;
     }
-    if (!regGender) {
+    if (settings?.regFieldGender !== false && !regGender) {
       setErrorMsg('অনুগ্রহ করে আপনার লিঙ্গ নির্বাচন করুন');
       return;
     }
-    if (!regDob) {
+    if (settings?.regFieldDob !== false && !regDob) {
       setErrorMsg('অনুগ্রহ করে আপনার জন্ম তারিখ প্রদান করুন');
       return;
     }
-    if (regEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(regEmail)) {
+    if (settings?.regFieldEmail !== false && regEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(regEmail)) {
       setErrorMsg('সঠিক ইমেইল আইডি প্রদান করুন (অথবা এটি খালি রাখুন)');
       return;
     }
-    if (!regCurrentAddress.trim()) {
+    if (settings?.regFieldCurrentAddress !== false && !regCurrentAddress.trim()) {
       setErrorMsg('অনুগ্রহ করে আপনার বর্তমান ঠিকানা প্রদান করুন');
       return;
     }
-    if (!regPermanentAddress.trim()) {
+    if (settings?.regFieldPermanentAddress !== false && !regPermanentAddress.trim()) {
       setErrorMsg('অনুগ্রহ করে আপনার স্থায়ী ঠিকানা প্রদান করুন');
       return;
     }
-    if (!regBkash.trim() && !regNagad.trim()) {
-      setErrorMsg('নিবন্ধনের জন্য বিকাশ অথবা নগদ নম্বর - যেকোনো অন্তত একটি প্রদান করুন।');
-      return;
-    }
-    if (regBkash.trim() && (regBkash.trim().length !== 11 || !regBkash.trim().startsWith('01'))) {
-      setErrorMsg('বিকাশ নম্বরটি অবশ্যই সঠিক ১১ ডিজিটের মোবাইল নম্বর হতে হবে।');
-      return;
-    }
-    if (regNagad.trim() && (regNagad.trim().length !== 11 || !regNagad.trim().startsWith('01'))) {
-      setErrorMsg('নগদ নম্বরটি অবশ্যই সঠিক ১১ ডিজিটের মোবাইল নম্বর হতে হবে।');
-      return;
+    if (settings?.regFieldMfs !== false) {
+      if (!regBkash.trim() && !regNagad.trim()) {
+        setErrorMsg('নিবন্ধনের জন্য বিকাশ অথবা নগদ নম্বর - যেকোনো অন্তত একটি প্রদান করুন।');
+        return;
+      }
+      if (regBkash.trim() && (regBkash.trim().length !== 11 || !regBkash.trim().startsWith('01'))) {
+        setErrorMsg('বিকাশ নম্বরটি অবশ্যই সঠিক ১১ ডিজিটের মোবাইল নম্বর হতে হবে।');
+        return;
+      }
+      if (regNagad.trim() && (regNagad.trim().length !== 11 || !regNagad.trim().startsWith('01'))) {
+        setErrorMsg('নগদ নম্বরটি অবশ্যই সঠিক ১১ ডিজিটের মোবাইল নম্বর হতে হবে।');
+        return;
+      }
     }
     if (regPin.length < 4 || regPin.length > 6 || !/^\d+$/.test(regPin)) {
       setErrorMsg('নিরাপত্তা পিন অবশ্যই ৪ থেকে ৬ ডিজিটের সংখ্যা হতে হবে');
@@ -379,178 +381,192 @@ export default function LoginScreen({ onLoginSuccess, initialPhone = '', setting
           </div>
 
           {/* Gender Field */}
-          <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-semibold text-zinc-400 font-sans mb-1">
-              লিঙ্গ (Gender)
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {['পুরুষ', 'মহিলা', 'অন্যান্য'].map((genderOption) => (
-                <button
-                  key={genderOption}
-                  type="button"
-                  onClick={() => {
-                    setRegGender(genderOption);
-                    if (errorMsg) setErrorMsg('');
-                  }}
-                  className={`py-2 px-3 text-xs font-sans rounded-xl border transition-all cursor-pointer ${
-                    regGender === genderOption
-                      ? 'bg-[#c5a059] border-[#c5a059] text-zinc-950 font-bold'
-                      : 'bg-[#121212] border-zinc-800/60 text-zinc-400 hover:border-[#c5a059]/20'
-                  }`}
-                >
-                  {genderOption}
-                </button>
-              ))}
+          {settings?.regFieldGender !== false && (
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-semibold text-zinc-400 font-sans mb-1">
+                লিঙ্গ (Gender)
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {['পুরুষ', 'মহিলা', 'অন্যান্য'].map((genderOption) => (
+                  <button
+                    key={genderOption}
+                    type="button"
+                    onClick={() => {
+                      setRegGender(genderOption);
+                      if (errorMsg) setErrorMsg('');
+                    }}
+                    className={`py-2 px-3 text-xs font-sans rounded-xl border transition-all cursor-pointer ${
+                      regGender === genderOption
+                        ? 'bg-[#c5a059] border-[#c5a059] text-zinc-950 font-bold'
+                        : 'bg-[#121212] border-zinc-800/60 text-zinc-400 hover:border-[#c5a059]/20'
+                    }`}
+                  >
+                    {genderOption}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Date of Birth Field */}
-          <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-semibold text-zinc-400 font-sans mb-1">
-              জন্ম তারিখ (Date of Birth)
-            </label>
-            <div className="relative flex items-center">
-              <Calendar className="absolute left-4 w-4 h-4 text-zinc-600 pointer-events-none" />
-              <input
-                type="date"
-                value={regDob}
-                onChange={(e) => {
-                  setRegDob(e.target.value);
-                  if (errorMsg) setErrorMsg('');
-                }}
-                className="w-full bg-[#121212] border border-zinc-800/80 focus:border-[#c5a059]/40 rounded-xl py-3 pl-11 pr-4 text-sm font-sans text-zinc-200 focus:outline-none transition-all font-normal"
-                required
-              />
+          {settings?.regFieldDob !== false && (
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-semibold text-zinc-400 font-sans mb-1">
+                জন্ম তারিখ (Date of Birth)
+              </label>
+              <div className="relative flex items-center">
+                <Calendar className="absolute left-4 w-4 h-4 text-zinc-600 pointer-events-none" />
+                <input
+                  type="date"
+                  value={regDob}
+                  onChange={(e) => {
+                    setRegDob(e.target.value);
+                    if (errorMsg) setErrorMsg('');
+                  }}
+                  className="w-full bg-[#121212] border border-zinc-800/80 focus:border-[#c5a059]/40 rounded-xl py-3 pl-11 pr-4 text-sm font-sans text-zinc-200 focus:outline-none transition-all font-normal"
+                  required
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Email Field */}
-          <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-semibold text-zinc-400 font-sans mb-1">
-              ইমেইল ঠিকানা (Email Address - ঐচ্ছিক)
-            </label>
-            <div className="relative flex items-center">
-              <Mail className="absolute left-4 w-4 h-4 text-zinc-600" />
-              <input
-                type="email"
-                value={regEmail}
-                onChange={(e) => {
-                  setRegEmail(e.target.value);
-                  if (errorMsg) setErrorMsg('');
-                }}
-                placeholder="name@example.com"
-                className="w-full bg-[#121212] border border-zinc-800/80 focus:border-[#c5a059]/40 rounded-xl py-3 pl-11 pr-4 text-sm font-sans text-zinc-200 focus:outline-none transition-all font-normal"
-              />
+          {settings?.regFieldEmail !== false && (
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-semibold text-zinc-400 font-sans mb-1">
+                ইমেইল ঠিকানা (Email Address - ঐচ্ছিক)
+              </label>
+              <div className="relative flex items-center">
+                <Mail className="absolute left-4 w-4 h-4 text-zinc-600" />
+                <input
+                  type="email"
+                  value={regEmail}
+                  onChange={(e) => {
+                    setRegEmail(e.target.value);
+                    if (errorMsg) setErrorMsg('');
+                  }}
+                  placeholder="name@example.com"
+                  className="w-full bg-[#121212] border border-zinc-800/80 focus:border-[#c5a059]/40 rounded-xl py-3 pl-11 pr-4 text-sm font-sans text-zinc-200 focus:outline-none transition-all font-normal"
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Current Address Field */}
-          <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-semibold text-zinc-400 font-sans mb-1">
-              বর্তমান ঠিকানা (Current Address)
-            </label>
-            <div className="relative flex items-start">
-              <MapPin className="absolute left-4 top-3 w-4 h-4 text-zinc-600" />
-              <textarea
-                value={regCurrentAddress}
-                onChange={(e) => {
-                  setRegCurrentAddress(e.target.value);
-                  if (errorMsg) setErrorMsg('');
-                }}
-                placeholder="বাড়ি নং, গ্রাম, থানা, জেলা"
-                className="w-full bg-[#121212] border border-zinc-800/80 focus:border-[#c5a059]/40 rounded-xl py-2.5 pl-11 pr-4 text-sm font-sans text-zinc-200 focus:outline-none transition-all font-normal h-16 resize-none"
-                required
-              />
+          {settings?.regFieldCurrentAddress !== false && (
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-semibold text-zinc-400 font-sans mb-1">
+                বর্তমান ঠিকানা (Current Address)
+              </label>
+              <div className="relative flex items-start">
+                <MapPin className="absolute left-4 top-3 w-4 h-4 text-zinc-600" />
+                <textarea
+                  value={regCurrentAddress}
+                  onChange={(e) => {
+                    setRegCurrentAddress(e.target.value);
+                    if (errorMsg) setErrorMsg('');
+                  }}
+                  placeholder="বাড়ি নং, গ্রাম, থানা, জেলা"
+                  className="w-full bg-[#121212] border border-zinc-800/80 focus:border-[#c5a059]/40 rounded-xl py-2.5 pl-11 pr-4 text-sm font-sans text-zinc-200 focus:outline-none transition-all font-normal h-16 resize-none"
+                  required
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Permanent Address Field */}
-          <div className="flex flex-col gap-1">
-            <div className="flex justify-between items-center mb-1">
-              <label className="text-[11px] font-semibold text-zinc-400 font-sans">
-                স্থায়ী ঠিকানা (Permanent Address)
-              </label>
-              <div className="flex items-center gap-1.5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  id="same-address"
-                  className="rounded border-[#c5a059]/40 bg-zinc-900 text-[#c5a059] focus:ring-0 focus:ring-offset-0 w-3 h-3 cursor-pointer"
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setRegPermanentAddress(regCurrentAddress);
-                    }
-                  }}
-                />
-                <label htmlFor="same-address" className="text-[10px] text-[#c5a059] font-semibold cursor-pointer">
-                  বর্তমান ঠিকানার মতই (Same)
+          {settings?.regFieldPermanentAddress !== false && (
+            <div className="flex flex-col gap-1">
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-[11px] font-semibold text-zinc-400 font-sans">
+                  স্থায়ী ঠিকানা (Permanent Address)
                 </label>
+                {settings?.regFieldCurrentAddress !== false && (
+                  <div className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      id="same-address"
+                      className="rounded border-[#c5a059]/40 bg-zinc-900 text-[#c5a059] focus:ring-0 focus:ring-offset-0 w-3 h-3 cursor-pointer"
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setRegPermanentAddress(regCurrentAddress);
+                        }
+                      }}
+                    />
+                    <label htmlFor="same-address" className="text-[10px] text-[#c5a059] font-semibold cursor-pointer">
+                      বর্তমান ঠিকানার মতই (Same)
+                    </label>
+                  </div>
+                )}
+              </div>
+              <div className="relative flex items-start">
+                <MapPin className="absolute left-4 top-3 w-4 h-4 text-zinc-600" />
+                <textarea
+                  value={regPermanentAddress}
+                  onChange={(e) => {
+                    setRegPermanentAddress(e.target.value);
+                    if (errorMsg) setErrorMsg('');
+                  }}
+                  placeholder="স্থায়ী গ্রাম, থানা ও জেলা"
+                  className="w-full bg-[#121212] border border-zinc-800/80 focus:border-[#c5a059]/40 rounded-xl py-2.5 pl-11 pr-4 text-sm font-sans text-zinc-200 focus:outline-none transition-all font-normal h-16 resize-none"
+                  required
+                />
               </div>
             </div>
-            <div className="relative flex items-start">
-              <MapPin className="absolute left-4 top-3 w-4 h-4 text-zinc-600" />
-              <textarea
-                value={regPermanentAddress}
-                onChange={(e) => {
-                  setRegPermanentAddress(e.target.value);
-                  if (errorMsg) setErrorMsg('');
-                }}
-                placeholder="স্থায়ী গ্রাম, থানা ও জেলা"
-                className="w-full bg-[#121212] border border-zinc-800/80 focus:border-[#c5a059]/40 rounded-xl py-2.5 pl-11 pr-4 text-sm font-sans text-zinc-200 focus:outline-none transition-all font-normal h-16 resize-none"
-                required
-              />
-            </div>
-          </div>
+          )}
 
           {/* bKash and Nagad Wallet Numbers */}
-          <div className="bg-zinc-950/20 p-3.5 rounded-xl border border-zinc-900/65 flex flex-col gap-2.5">
-            <span className="text-[10px] text-[#c5a059] font-bold font-sans">মোবাইল ফিন্যান্সিয়াল সার্ভিস (MFS) অ্যাকাউন্ট</span>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* bKash input */}
-              <div className="flex flex-col gap-1">
-                <label className="text-[10.5px] font-semibold text-zinc-400 font-sans mb-0.5 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-pink-500" /> বিকাশ অ্যাকাউন্ট নম্বর
-                </label>
-                <div className="relative flex items-center">
-                  <span className="absolute left-3.5 text-[9px] uppercase font-serif font-black text-pink-500">bKash</span>
-                  <input
-                    type="tel"
-                    id="reg-bkash-no"
-                    maxLength={11}
-                    value={regBkash}
-                    onChange={(e) => {
-                      setRegBkash(cleanNumericInput(e.target.value));
-                      if (errorMsg) setErrorMsg('');
-                    }}
-                    placeholder="01XXXXXXXXX"
-                    className="w-full bg-[#0d0d0f] border border-zinc-850/80 focus:border-pink-500/40 rounded-xl py-2.5 pl-14 pr-3 text-xs font-mono text-zinc-200 focus:outline-none transition-all font-normal"
-                  />
+          {settings?.regFieldMfs !== false && (
+            <div className="bg-zinc-950/20 p-3.5 rounded-xl border border-zinc-900/65 flex flex-col gap-2.5">
+              <span className="text-[10px] text-[#c5a059] font-bold font-sans">মোবাইল ফিন্যান্সিয়াল সার্ভিস (MFS) অ্যাকাউন্ট</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* bKash input */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10.5px] font-semibold text-zinc-400 font-sans mb-0.5 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-pink-500" /> বিকাশ অ্যাকাউন্ট নম্বর
+                  </label>
+                  <div className="relative flex items-center">
+                    <span className="absolute left-3.5 text-[9px] uppercase font-serif font-black text-pink-500">bKash</span>
+                    <input
+                      type="tel"
+                      id="reg-bkash-no"
+                      maxLength={11}
+                      value={regBkash}
+                      onChange={(e) => {
+                        setRegBkash(cleanNumericInput(e.target.value));
+                        if (errorMsg) setErrorMsg('');
+                      }}
+                      placeholder="01XXXXXXXXX"
+                      className="w-full bg-[#0d0d0f] border border-zinc-850/80 focus:border-pink-500/40 rounded-xl py-2.5 pl-14 pr-3 text-xs font-mono text-zinc-200 focus:outline-none transition-all font-normal"
+                    />
+                  </div>
                 </div>
-              </div>
 
-              {/* Nagad input */}
-              <div className="flex flex-col gap-1">
-                <label className="text-[10.5px] font-semibold text-zinc-400 font-sans mb-0.5 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-orange-500" /> নগদ অ্যাকাউন্ট নম্বর
-                </label>
-                <div className="relative flex items-center">
-                  <span className="absolute left-3.5 text-[9px] uppercase font-serif font-black text-orange-500">Nagad</span>
-                  <input
-                    type="tel"
-                    id="reg-nagad-no"
-                    maxLength={11}
-                    value={regNagad}
-                    onChange={(e) => {
-                      setRegNagad(cleanNumericInput(e.target.value));
-                      if (errorMsg) setErrorMsg('');
-                    }}
-                    placeholder="01XXXXXXXXX"
-                    className="w-full bg-[#0d0d0f] border border-zinc-850/80 focus:border-orange-500/40 rounded-xl py-2.5 pl-14 pr-3 text-xs font-mono text-zinc-200 focus:outline-none transition-all font-normal"
-                  />
+                {/* Nagad input */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10.5px] font-semibold text-zinc-400 font-sans mb-0.5 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-orange-500" /> নগদ অ্যাকাউন্ট নম্বর
+                  </label>
+                  <div className="relative flex items-center">
+                    <span className="absolute left-3.5 text-[9px] uppercase font-serif font-black text-orange-500">Nagad</span>
+                    <input
+                      type="tel"
+                      id="reg-nagad-no"
+                      maxLength={11}
+                      value={regNagad}
+                      onChange={(e) => {
+                        setRegNagad(cleanNumericInput(e.target.value));
+                        if (errorMsg) setErrorMsg('');
+                      }}
+                      placeholder="01XXXXXXXXX"
+                      className="w-full bg-[#0d0d0f] border border-zinc-850/80 focus:border-orange-500/40 rounded-xl py-2.5 pl-14 pr-3 text-xs font-mono text-zinc-200 focus:outline-none transition-all font-normal"
+                    />
+                  </div>
                 </div>
               </div>
+              <p className="text-[9px] text-zinc-550 leading-tight">বিকাশ ও নগদের যেকোনো একটি বা দুটি দিতে পারবেন। নিবন্ধনের জন্য অন্তত একটি প্রয়োজনীয়।</p>
             </div>
-            <p className="text-[9px] text-zinc-550 leading-tight">বিকাশ ও নগদের যেকোনো একটি বা দুটি দিতে পারবেন। নিবন্ধনের জন্য অন্তত একটি প্রয়োজনীয়।</p>
-          </div>
+          )}
 
           {/* Choose PIN Field */}
           <div className="flex flex-col gap-1">

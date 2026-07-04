@@ -749,7 +749,13 @@ const DEFAULT_SETTINGS = {
   maxLoanMonths: 18,
   loanMonthPresets: "3, 6, 9, 12",
   requireMinSavingsForLoan: false,
-  minSavingsForLoanAmount: 500
+  minSavingsForLoanAmount: 500,
+  regFieldGender: true,
+  regFieldDob: true,
+  regFieldEmail: true,
+  regFieldCurrentAddress: true,
+  regFieldPermanentAddress: true,
+  regFieldMfs: true
 };
 
 // Helper to brute force and decode a 4-6 digit SHA-256 PIN back to plain text
@@ -837,6 +843,30 @@ function runDatabaseMigrations(db: any): boolean {
     }
     if (db.settings.minSavingsForLoanAmount === undefined) {
       db.settings.minSavingsForLoanAmount = 500;
+      modified = true;
+    }
+    if (db.settings.regFieldGender === undefined) {
+      db.settings.regFieldGender = true;
+      modified = true;
+    }
+    if (db.settings.regFieldDob === undefined) {
+      db.settings.regFieldDob = true;
+      modified = true;
+    }
+    if (db.settings.regFieldEmail === undefined) {
+      db.settings.regFieldEmail = true;
+      modified = true;
+    }
+    if (db.settings.regFieldCurrentAddress === undefined) {
+      db.settings.regFieldCurrentAddress = true;
+      modified = true;
+    }
+    if (db.settings.regFieldPermanentAddress === undefined) {
+      db.settings.regFieldPermanentAddress = true;
+      modified = true;
+    }
+    if (db.settings.regFieldMfs === undefined) {
+      db.settings.regFieldMfs = true;
       modified = true;
     }
   }
@@ -2519,7 +2549,13 @@ app.post("/api/admin/settings/update", (req, res) => {
     maxLoanMonths: Number(settings.maxLoanMonths) !== undefined ? Number(settings.maxLoanMonths) : 18,
     loanMonthPresets: settings.loanMonthPresets !== undefined ? settings.loanMonthPresets : "3, 6, 9, 12",
     requireMinSavingsForLoan: settings.requireMinSavingsForLoan !== undefined ? !!settings.requireMinSavingsForLoan : false,
-    minSavingsForLoanAmount: Number(settings.minSavingsForLoanAmount) !== undefined ? Number(settings.minSavingsForLoanAmount) : 500
+    minSavingsForLoanAmount: Number(settings.minSavingsForLoanAmount) !== undefined ? Number(settings.minSavingsForLoanAmount) : 500,
+    regFieldGender: settings.regFieldGender !== undefined ? !!settings.regFieldGender : true,
+    regFieldDob: settings.regFieldDob !== undefined ? !!settings.regFieldDob : true,
+    regFieldEmail: settings.regFieldEmail !== undefined ? !!settings.regFieldEmail : true,
+    regFieldCurrentAddress: settings.regFieldCurrentAddress !== undefined ? !!settings.regFieldCurrentAddress : true,
+    regFieldPermanentAddress: settings.regFieldPermanentAddress !== undefined ? !!settings.regFieldPermanentAddress : true,
+    regFieldMfs: settings.regFieldMfs !== undefined ? !!settings.regFieldMfs : true
   };
 
   writeDB(db);
