@@ -136,6 +136,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
   // Search filter
   const [searchQuery, setSearchQuery] = useState('');
   const [liveSearchQuery, setLiveSearchQuery] = useState('');
+  const [adminNotesSearch, setAdminNotesSearch] = useState('');
 
   // Forms state
   const [subAdminForm, setSubAdminForm] = useState({
@@ -2569,7 +2570,134 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                 
                 {/* Sub Tab: Admin Notes */}
                 {userSubTab === 'admin_notes' && operator?.role === 'main_admin' && (
-                  <form onSubmit={handleUpdateAdminNotes} className="flex flex-col gap-3.5 mt-1">
+                  <div className="flex flex-col gap-3.5 mt-1">
+                    {/* Search by Number Widget inside Admin Notes */}
+                    <div className="p-3.5 bg-zinc-950/60 border border-zinc-900/80 rounded-xl flex flex-col gap-2.5">
+                      <div className="flex items-center gap-1.5 border-b border-zinc-900 pb-2">
+                        <Search className="w-3.5 h-3.5 text-[#c5a059]" />
+                        <span className="text-[10.5px] font-bold text-zinc-300 uppercase tracking-wide">নম্বর ট্র্যাকিং ও গেটওয়ে অ্যাক্সেস সার্চ</span>
+                      </div>
+                      
+                      <div className="relative">
+                        <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-zinc-500" />
+                        <input
+                          type="text"
+                          placeholder="নম্বর লিখে খুঁজুন (মোবাইল, বিকাশ, নগদ বা সিম)..."
+                          value={adminNotesSearch}
+                          onChange={(e) => setAdminNotesSearch(e.target.value)}
+                          className="w-full bg-zinc-900 border border-zinc-850 rounded-lg py-2 pl-9 pr-8 text-xs font-sans text-zinc-300 focus:outline-none focus:border-[#c5a059]/40 font-mono"
+                        />
+                        {adminNotesSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setAdminNotesSearch('')}
+                            className="absolute right-2.5 top-2.5 text-zinc-500 hover:text-zinc-300 cursor-pointer animate-fade-in"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+
+                      {adminNotesSearch.trim() && (() => {
+                        const searchLower = adminNotesSearch.trim().toLowerCase();
+                        const matchedUsers = users.filter((u) => {
+                          return (
+                            (u.phone && u.phone.toLowerCase().includes(searchLower)) ||
+                            (u.bkashNo && u.bkashNo.toLowerCase().includes(searchLower)) ||
+                            (u.nagadNo && u.nagadNo.toLowerCase().includes(searchLower)) ||
+                            (u.adminSim && u.adminSim.toLowerCase().includes(searchLower)) ||
+                            (u.adminDisburseNumber && u.adminDisburseNumber.toLowerCase().includes(searchLower)) ||
+                            (u.adminWhatsapp && u.adminWhatsapp.toLowerCase().includes(searchLower))
+                          );
+                        });
+
+                        return (
+                          <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto mt-1 pr-1 custom-scrollbar">
+                            <span className="text-[9.5px] text-zinc-550 font-bold block">
+                              সার্চ ফলাফল ({toBanglaDigits(matchedUsers.length)} জন পাওয়া গেছে):
+                            </span>
+                            {matchedUsers.length === 0 ? (
+                              <div className="text-center py-4 bg-zinc-900/30 border border-dashed border-zinc-900 rounded-lg text-zinc-500 text-[10px]">
+                                এই নম্বর দিয়ে কোনো গ্রাহক পাওয়া যায়নি।
+                              </div>
+                            ) : (
+                              matchedUsers.map((u) => {
+                                const hasBkashAccess = !!u.bkashNo || u.adminDisburseMethod === 'bkash';
+                                const hasNagadAccess = !!u.nagadNo || u.adminDisburseMethod === 'nagad';
+                                const isCurrentSelected = u.phone === selectedUser.phone;
+                                
+                                return (
+                                  <div
+                                    key={u.phone}
+                                    onClick={() => {
+                                      setSelectedUser(u);
+                                    }}
+                                    className={`p-2.5 border rounded-lg flex flex-col gap-1.5 transition-all cursor-pointer text-left ${
+                                      isCurrentSelected 
+                                        ? 'bg-[#c5a059]/10 border-[#c5a059]/30' 
+                                        : 'bg-zinc-900/50 hover:bg-zinc-900 border-zinc-850/60 hover:border-zinc-800'
+                                    }`}
+                                  >
+                                    <div className="flex justify-between items-start gap-1">
+                                      <div>
+                                        <span className="text-xs font-bold text-zinc-250 block font-sans">{u.name}</span>
+                                        <span className="text-[9px] text-zinc-500 font-mono">লগইন: {toBanglaDigits(u.phone)}</span>
+                                      </div>
+                                      <div className="flex flex-wrap gap-1 justify-end max-w-[150px]">
+                                        {hasBkashAccess ? (
+                                          <span className="text-[8px] font-bold text-pink-500 bg-pink-950/20 border border-pink-900/30 px-1 py-0.5 rounded flex items-center gap-0.5 whitespace-nowrap">
+                                            <span className="w-1 h-1 rounded-full bg-pink-500 animate-pulse" />
+                                            bKash সচল
+                                          </span>
+                                        ) : (
+                                          <span className="text-[8px] font-bold text-zinc-500 bg-zinc-950 border border-zinc-900 px-1 py-0.5 rounded whitespace-nowrap">
+                                            bKash নেই
+                                          </span>
+                                        )}
+                                        {hasNagadAccess ? (
+                                          <span className="text-[8px] font-bold text-orange-500 bg-orange-950/20 border border-orange-900/30 px-1 py-0.5 rounded flex items-center gap-0.5 whitespace-nowrap">
+                                            <span className="w-1 h-1 rounded-full bg-orange-500 animate-pulse" />
+                                            Nagad সচল
+                                          </span>
+                                        ) : (
+                                          <span className="text-[8px] font-bold text-zinc-500 bg-zinc-950 border border-zinc-900 px-1 py-0.5 rounded whitespace-nowrap">
+                                            Nagad নেই
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-2 gap-1.5 text-[9px] bg-zinc-950/40 p-1.5 rounded border border-zinc-900/40 font-mono">
+                                      <div className="flex flex-col">
+                                        <span className="text-zinc-550 text-[8px]">বিকাশ নম্বর:</span>
+                                        <span className="text-zinc-400 truncate">{u.bkashNo ? toBanglaDigits(u.bkashNo) : 'নেই'}</span>
+                                      </div>
+                                      <div className="flex flex-col">
+                                        <span className="text-zinc-550 text-[8px]">নগদ নম্বর:</span>
+                                        <span className="text-zinc-400 truncate">{u.nagadNo ? toBanglaDigits(u.nagadNo) : 'নেই'}</span>
+                                      </div>
+                                      {u.adminSim && (
+                                        <div className="col-span-2 border-t border-zinc-900/30 pt-1 mt-1 flex justify-between font-sans text-zinc-400 text-[8.5px]">
+                                          <span>সিম: <span className="font-mono">{toBanglaDigits(u.adminSim)}</span></span>
+                                          {u.adminDisburseMethod && (
+                                            <span>মেথড: <span className="text-[#dfc187] font-semibold">{u.adminDisburseMethod.toUpperCase()}</span></span>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="text-[8px] text-[#c5a059] flex items-center gap-0.5 justify-end font-sans">
+                                      <span>{isCurrentSelected ? 'বর্তমানে এই প্রোফাইলটি নির্বাচিত আছে' : 'এডিট করতে গ্রাহক নির্বাচন করুন'}</span>
+                                      <span>&rarr;</span>
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+
                     {/* Information Alert */}
                     <div className="p-3 bg-[#161412] border border-[#c5a059]/15 rounded-xl flex gap-2.5">
                       <ShieldCheck className="w-5 h-5 text-[#c5a059] shrink-0 mt-0.5" />
@@ -2581,107 +2709,109 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                       </div>
                     </div>
 
-                    <div className="p-3.5 bg-zinc-950/40 border border-zinc-900/60 rounded-xl flex flex-col gap-3 font-sans">
-                      {/* 1. WhatsApp Number */}
-                      <div>
-                        <label className="text-[10px] text-zinc-400 block mb-1 font-semibold">সহজে যোগাযোগ করার নাম্বার</label>
-                        <div className="flex items-center gap-2">
-                          <div className="relative flex-1">
-                            <input
-                              type="tel"
-                              placeholder="সহজে যোগাযোগ করার নাম্বার"
-                              maxLength={11}
-                              value={adminNotesForm.adminWhatsapp}
-                              onChange={(e) => setAdminNotesForm({ ...adminNotesForm, adminWhatsapp: formatBanglaPhoneNumber(e.target.value) })}
-                              className="bg-zinc-900 text-zinc-200 border border-zinc-850 rounded-lg text-xs py-2 pl-3 pr-14 w-full focus:outline-none focus:border-[#c5a059]/40 font-mono"
-                            />
-                            {adminNotesForm.adminWhatsapp.trim() !== (selectedUser.phone || '').trim() && (
-                              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-amber-500 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded select-none animate-pulse">
-                                Edited
-                              </span>
-                            )}
+                    <form onSubmit={handleUpdateAdminNotes} className="flex flex-col gap-3.5">
+                      <div className="p-3.5 bg-zinc-950/40 border border-zinc-900/60 rounded-xl flex flex-col gap-3 font-sans">
+                        {/* 1. WhatsApp Number */}
+                        <div>
+                          <label className="text-[10px] text-zinc-400 block mb-1 font-semibold">সহজে যোগাযোগ করার নাম্বার</label>
+                          <div className="flex items-center gap-2">
+                            <div className="relative flex-1">
+                              <input
+                                type="tel"
+                                placeholder="সহজে যোগাযোগ করার নাম্বার"
+                                maxLength={11}
+                                value={adminNotesForm.adminWhatsapp}
+                                onChange={(e) => setAdminNotesForm({ ...adminNotesForm, adminWhatsapp: formatBanglaPhoneNumber(e.target.value) })}
+                                className="bg-zinc-900 text-zinc-200 border border-zinc-850 rounded-lg text-xs py-2 pl-3 pr-14 w-full focus:outline-none focus:border-[#c5a059]/40 font-mono"
+                              />
+                              {adminNotesForm.adminWhatsapp.trim() !== (selectedUser.phone || '').trim() && (
+                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-amber-500 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded select-none animate-pulse">
+                                  Edited
+                                </span>
+                              )}
+                            </div>
+                            <a 
+                              href={`https://wa.me/${adminNotesForm.adminWhatsapp.startsWith('0') ? '88' + adminNotesForm.adminWhatsapp : adminNotesForm.adminWhatsapp}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="bg-[#25D366] hover:bg-[#20ba59] text-white p-2.5 rounded-lg text-xs flex items-center justify-center transition-colors h-[34px] w-[34px] shrink-0"
+                              title="হোয়াটসঅ্যাপ চ্যাট ওপেন করুন"
+                            >
+                              <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.665.988 3.3 1.488 5.36 1.489 5.517 0 10.003-4.482 10.006-9.997.001-2.672-1.03-5.185-2.906-7.062C17.233 1.707 14.73 1.665 12.01 1.665c-5.518 0-10.002 4.483-10.006 10c-.001 2.11.561 4.15 1.63 5.932l-.994 3.633 3.73-.976z"/>
+                              </svg>
+                            </a>
                           </div>
-                          <a 
-                            href={`https://wa.me/${adminNotesForm.adminWhatsapp.startsWith('0') ? '88' + adminNotesForm.adminWhatsapp : adminNotesForm.adminWhatsapp}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="bg-[#25D366] hover:bg-[#20ba59] text-white p-2.5 rounded-lg text-xs flex items-center justify-center transition-colors h-[34px] w-[34px] shrink-0"
-                            title="হোয়াটসঅ্যাপ চ্যাট ওপেন করুন"
-                          >
-                            <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                              <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.665.988 3.3 1.488 5.36 1.489 5.517 0 10.003-4.482 10.006-9.997.001-2.672-1.03-5.185-2.906-7.062C17.233 1.707 14.73 1.665 12.01 1.665c-5.518 0-10.002 4.483-10.006 10c-.001 2.11.561 4.15 1.63 5.932l-.994 3.633 3.73-.976z"/>
-                            </svg>
-                          </a>
                         </div>
-                      </div>
 
-                      {/* 2. Admin SIM */}
-                      <div>
-                        <label className="text-[10px] text-zinc-400 block mb-1 font-semibold">কোন সিম দ্বারা অ্যাক্সেস (সিম ট্র্যাকিং)</label>
-                        <input
-                          type="tel"
-                          placeholder="যেমন: 01712345678"
-                          maxLength={11}
-                          value={adminNotesForm.adminSim}
-                          onChange={(e) => setAdminNotesForm({ ...adminNotesForm, adminSim: formatBanglaPhoneNumber(e.target.value) })}
-                          className="w-full bg-zinc-900 text-zinc-200 border border-zinc-850 rounded-lg text-xs py-2 px-3 focus:outline-none focus:border-[#c5a059]/40 font-mono"
-                        />
-                      </div>
-
-                      {/* 3. Disbursement Preference */}
-                      <div>
-                        <label className="text-[10px] text-zinc-400 block mb-1 font-semibold">কোন নাম্বারে ও মেথডে লোন দিবেন</label>
-                        <div className="grid grid-cols-3 gap-2">
-                          <select
-                            value={adminNotesForm.adminDisburseMethod}
-                            onChange={(e) => setAdminNotesForm({ ...adminNotesForm, adminDisburseMethod: e.target.value })}
-                            className="bg-zinc-900 text-zinc-200 border border-zinc-850 rounded-lg text-xs py-2 px-1 focus:outline-none focus:border-[#c5a059]/40"
-                          >
-                            <option value="bkash">bKash</option>
-                            <option value="nagad">Nagad</option>
-                            <option value="rocket">Rocket</option>
-                            <option value="bank">Bank</option>
-                          </select>
+                        {/* 2. Admin SIM */}
+                        <div>
+                          <label className="text-[10px] text-zinc-400 block mb-1 font-semibold">কোন সিম দ্বারা অ্যাক্সেস (সিম ট্র্যাকিং)</label>
                           <input
                             type="tel"
-                            placeholder="মোবাইল/ব্যাংক একাউন্ট নম্বর"
-                            maxLength={adminNotesForm.adminDisburseMethod === 'bank' ? 25 : 11}
-                            value={adminNotesForm.adminDisburseNumber}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              const isBank = adminNotesForm.adminDisburseMethod === 'bank';
-                              setAdminNotesForm({
-                                ...adminNotesForm,
-                                adminDisburseNumber: isBank ? val : formatBanglaPhoneNumber(val)
-                              });
-                            }}
-                            className="col-span-2 bg-zinc-900 text-zinc-200 border border-zinc-850 rounded-lg text-xs py-2 px-3 focus:outline-none focus:border-[#c5a059]/40 font-mono"
+                            placeholder="যেমন: 01712345678"
+                            maxLength={11}
+                            value={adminNotesForm.adminSim}
+                            onChange={(e) => setAdminNotesForm({ ...adminNotesForm, adminSim: formatBanglaPhoneNumber(e.target.value) })}
+                            className="w-full bg-zinc-900 text-zinc-200 border border-zinc-850 rounded-lg text-xs py-2 px-3 focus:outline-none focus:border-[#c5a059]/40 font-mono"
+                          />
+                        </div>
+
+                        {/* 3. Disbursement Preference */}
+                        <div>
+                          <label className="text-[10px] text-zinc-400 block mb-1 font-semibold">কোন নাম্বারে ও মেথডে লোন দিবেন</label>
+                          <div className="grid grid-cols-3 gap-2">
+                            <select
+                              value={adminNotesForm.adminDisburseMethod}
+                              onChange={(e) => setAdminNotesForm({ ...adminNotesForm, adminDisburseMethod: e.target.value })}
+                              className="bg-zinc-900 text-zinc-200 border border-zinc-850 rounded-lg text-xs py-2 px-1 focus:outline-none focus:border-[#c5a059]/40"
+                            >
+                              <option value="bkash">bKash</option>
+                              <option value="nagad">Nagad</option>
+                              <option value="rocket">Rocket</option>
+                              <option value="bank">Bank</option>
+                            </select>
+                            <input
+                              type="tel"
+                              placeholder="মোবাইল/ব্যাংক একাউন্ট নম্বর"
+                              maxLength={adminNotesForm.adminDisburseMethod === 'bank' ? 25 : 11}
+                              value={adminNotesForm.adminDisburseNumber}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                const isBank = adminNotesForm.adminDisburseMethod === 'bank';
+                                setAdminNotesForm({
+                                  ...adminNotesForm,
+                                  adminDisburseNumber: isBank ? val : formatBanglaPhoneNumber(val)
+                                });
+                              }}
+                              className="col-span-2 bg-zinc-900 text-zinc-200 border border-zinc-850 rounded-lg text-xs py-2 px-3 focus:outline-none focus:border-[#c5a059]/40 font-mono"
+                            />
+                          </div>
+                        </div>
+
+                        {/* 4. Notes Textarea */}
+                        <div>
+                          <label className="text-[10px] text-zinc-400 block mb-1 font-semibold">অন্যান্য অ্যাডমিন নোটস</label>
+                          <textarea
+                            placeholder="গ্রাহক সম্পর্কে আপনার যেকোনো মন্তব্য বা নোট এখানে লিখে রাখুন..."
+                            value={adminNotesForm.adminNotesText}
+                            onChange={(e) => setAdminNotesForm({ ...adminNotesForm, adminNotesText: e.target.value })}
+                            className="w-full bg-zinc-900 text-zinc-200 border border-zinc-850 rounded-lg text-xs py-2 px-3 focus:outline-none focus:border-[#c5a059]/40 h-18 resize-none"
                           />
                         </div>
                       </div>
 
-                      {/* 4. Notes Textarea */}
-                      <div>
-                        <label className="text-[10px] text-zinc-400 block mb-1 font-semibold">অন্যান্য অ্যাডমিন নোটস</label>
-                        <textarea
-                          placeholder="গ্রাহক সম্পর্কে আপনার যেকোনো মন্তব্য বা নোট এখানে লিখে রাখুন..."
-                          value={adminNotesForm.adminNotesText}
-                          onChange={(e) => setAdminNotesForm({ ...adminNotesForm, adminNotesText: e.target.value })}
-                          className="w-full bg-zinc-900 text-zinc-200 border border-zinc-850 rounded-lg text-xs py-2 px-3 focus:outline-none focus:border-[#c5a059]/40 h-18 resize-none"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Submit Button */}
-                    <button
-                      type="submit"
-                      disabled={actionLoading}
-                      className="w-full py-2.5 bg-[#c5a059] hover:bg-[#dfc187] text-zinc-950 font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <Save className="w-3.5 h-3.5" />
-                      <span>{actionLoading ? 'সংরক্ষণ করা হচ্ছে...' : 'অ্যাডমিন নোটস সংরক্ষণ করুন'}</span>
-                    </button>
-                  </form>
+                      {/* Submit Button */}
+                      <button
+                        type="submit"
+                        disabled={actionLoading}
+                        className="w-full py-2.5 bg-[#c5a059] hover:bg-[#dfc187] text-zinc-950 font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Save className="w-3.5 h-3.5" />
+                        <span>{actionLoading ? 'সংরক্ষণ করা হচ্ছে...' : 'অ্যাডমিন নোটস সংরক্ষণ করুন'}</span>
+                      </button>
+                    </form>
+                  </div>
                 )}
 
                 {/* Sub Tab: Transactions */}
