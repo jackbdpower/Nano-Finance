@@ -44,7 +44,7 @@ jobs:
 
       - name: Download pristine Gradle Wrapper Jar
         run: |
-          curl -sSLo android/gradle/wrapper/gradle-wrapper.jar https://repo.maven.apache.org/maven2/org/gradle/gradle-wrapper/8.14.3/gradle-wrapper-8.14.3.jar
+          curl -sSLo android/gradle/wrapper/gradle-wrapper.jar -L https://github.com/gradle/gradle/raw/v8.14.3/gradle/wrapper/gradle-wrapper.jar
 
       - name: Grant Execute Permissions to Gradle
         run: chmod +x android/gradlew
