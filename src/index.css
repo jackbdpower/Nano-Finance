@@ -49,6 +49,20 @@ body {
   background-color: #050505;
   color: #e4e4e7;
   transition: background-color 0.3s ease, color 0.3s ease;
+  
+  /* Disable user text selection globally to prevent simple content copying */
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+/* Allow text selection inside inputs and textareas so users can log in, register, and fill out forms */
+input, textarea, [contenteditable="true"] {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
 }
 
 /* ================== DYNAMIC LIGHT THEME OVERRIDES ================== */

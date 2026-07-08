@@ -1245,6 +1245,36 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
     }
   };
 
+  // Toggle user's block status
+  const handleToggleBlock = async (userPhone: string, currentBlockedStatus: boolean) => {
+    setActionLoading(true);
+    try {
+      const response = await fetch('/api/admin/user/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminPhone: operator.phone,
+          userPhone: userPhone,
+          isBlocked: !currentBlockedStatus
+        })
+      });
+      const data = await safeJsonParse(response);
+      if (response.ok && data.success) {
+        setUsers(data.users);
+        if (selectedUser?.phone === userPhone) {
+          setSelectedUser({ ...selectedUser, isBlocked: !currentBlockedStatus });
+        }
+        alert(currentBlockedStatus ? 'গ্রাহককে সফলভাবে আনব্লক করা হয়েছে!' : 'গ্রাহককে সফলভাবে ব্লক করা হয়েছে!');
+      } else {
+        alert(data.error || 'ব্লক/আনব্লক করতে ব্যর্থ হয়েছে।');
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   // Adjust user savings balance manually
   const handleAdjustBalance = async () => {
     if (!selectedUser) return;
@@ -2323,6 +2353,16 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                         <span className="text-zinc-500 text-[9.5px]">নিরাপত্তা পিন</span>
                         <span className="font-bold text-[#dfc187] font-mono text-[11px]">{selectedUser.pin}</span>
                       </div>
+                      <div className="p-2.5 bg-zinc-955/50 border border-zinc-900 rounded-xl flex flex-col gap-0.5">
+                        <span className="text-[#c5a059] text-[9.5px]">একাউন্টের বয়স</span>
+                        <span className="font-bold text-emerald-400 text-[11px]">{getAccountAgeLabel(selectedUser.createdAt)}</span>
+                      </div>
+                      <div className="p-2.5 bg-zinc-955/50 border border-zinc-900 rounded-xl flex flex-col gap-0.5 overflow-hidden">
+                        <span className="text-zinc-500 text-[9.5px]">নিবন্ধন সময়কাল</span>
+                        <span className="font-bold text-zinc-300 text-[9.5px] truncate" title={selectedUser.securityLogs?.find((l: any) => l.eventType === 'register' || l.eventType === 'registration')?.timeLabel || (selectedUser.createdAt ? new Date(selectedUser.createdAt).toLocaleString('bn-BD', { hour12: true }) : '০৯ জুন, ২০২৬ (০৯:৪২ AM)')}>
+                          {selectedUser.securityLogs?.find((l: any) => l.eventType === 'register' || l.eventType === 'registration')?.timeLabel || (selectedUser.createdAt ? new Date(selectedUser.createdAt).toLocaleString('bn-BD', { hour12: true }) : '০৯ জুন, ২০২৬ (০৯:৪২ AM)')}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Full Registration Details Showcase */}
@@ -2540,29 +2580,44 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                     </div>
 
                     {/* Verification and Suspension */}
-                    <div className="flex justify-between items-center gap-3 mt-1.5 pt-2 border-t border-zinc-900/50">
-                      <button
-                        type="button"
-                        onClick={() => handleToggleVerification(selectedUser.phone, selectedUser.isVerified)}
-                        disabled={actionLoading}
-                        className={`flex-1 py-2 px-3 rounded-xl border text-xs font-bold font-sans cursor-pointer transition-colors flex justify-center items-center gap-1.5 ${
-                          selectedUser.isVerified 
-                            ? 'bg-red-950/15 border-red-900/30 text-red-400 hover:bg-red-950/30' 
-                            : 'bg-emerald-950/15 border-emerald-900/30 text-emerald-400 hover:bg-emerald-950/30'
-                        }`}
-                      >
-                        {selectedUser.isVerified ? 'গ্রাহক আনভেরিফাইড করুন' : 'গ্রাহক ভেরিফাইড করুন'}
-                      </button>
+                    <div className="flex flex-col gap-2 mt-1.5 pt-2 border-t border-zinc-900/50">
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleVerification(selectedUser.phone, selectedUser.isVerified)}
+                          disabled={actionLoading}
+                          className={`flex-1 py-2 px-3 rounded-xl border text-xs font-bold font-sans cursor-pointer transition-colors flex justify-center items-center gap-1.5 ${
+                            selectedUser.isVerified 
+                              ? 'bg-red-950/15 border-red-900/30 text-red-400 hover:bg-red-950/30' 
+                              : 'bg-emerald-950/15 border-emerald-900/30 text-emerald-400 hover:bg-emerald-950/30'
+                          }`}
+                        >
+                          {selectedUser.isVerified ? 'আনভেরিফাইড করুন' : 'ভেরিফাইড করুন'}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleToggleBlock(selectedUser.phone, !!selectedUser.isBlocked)}
+                          disabled={actionLoading}
+                          className={`flex-1 py-2 px-3 rounded-xl border text-xs font-bold font-sans cursor-pointer transition-colors flex justify-center items-center gap-1.5 ${
+                            selectedUser.isBlocked 
+                              ? 'bg-[#c5a059]/15 border-[#c5a059]/30 text-[#dfc187] hover:bg-[#c5a059]/30' 
+                              : 'bg-red-950/20 border-red-900/40 text-red-500 hover:bg-red-950/40'
+                          }`}
+                        >
+                          {selectedUser.isBlocked ? 'আনব্লক করুন' : 'ব্লক করুন'}
+                        </button>
+                      </div>
 
                       <button
                         type="button"
                         onClick={() => handleDeleteUser(selectedUser.phone)}
                         disabled={actionLoading}
-                        className="py-2 px-3.5 bg-zinc-900 hover:bg-red-950 hover:text-red-350 border border-zinc-800 hover:border-red-900 rounded-xl text-xs font-bold text-zinc-500 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                        className="w-full py-2 px-3.5 bg-zinc-900 hover:bg-red-950 hover:text-red-350 border border-zinc-800 hover:border-red-900 rounded-xl text-xs font-bold text-zinc-500 transition-colors flex items-center justify-center gap-1 cursor-pointer"
                         title="গ্রাহক ডিঅ্যাক্টিভেট করুন"
                       >
                         <Trash2 className="w-4 h-4" />
-                        <span>অ্যাকাউন্ট মুছুন</span>
+                        <span>অ্যাকাউন্ট সম্পূর্ণ মুছুন</span>
                       </button>
                     </div>
                   </div>
@@ -3569,13 +3624,19 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
 
                             {/* Verification State */}
                             <td className="py-3 px-4 text-center">
-                              <span className={`inline-block px-2.5 py-0.5 rounded-full text-[9.5px] font-semibold border ${
-                                u.isVerified 
-                                  ? 'bg-emerald-950/20 border-emerald-900/40 text-emerald-400' 
-                                  : 'bg-amber-950/20 border-amber-900/40 text-amber-500'
-                              }`}>
-                                {u.isVerified ? 'সক্রিয় গ্রাহক' : 'অসম্পূর্ণ ভেরিফিকেশন'}
-                              </span>
+                              {u.isBlocked ? (
+                                <span className="inline-block px-2.5 py-0.5 rounded-full text-[9.5px] font-semibold border bg-red-950/20 border-red-900/40 text-red-400">
+                                  অ্যাকাউন্ট ব্লকড
+                                </span>
+                              ) : (
+                                <span className={`inline-block px-2.5 py-0.5 rounded-full text-[9.5px] font-semibold border ${
+                                  u.isVerified 
+                                    ? 'bg-emerald-950/20 border-emerald-900/40 text-emerald-400' 
+                                    : 'bg-amber-950/20 border-amber-900/40 text-amber-500'
+                                }`}>
+                                  {u.isVerified ? 'সক্রিয় গ্রাহক' : 'অসম্পূর্ণ ভেরিফিকেশন'}
+                                </span>
+                              )}
                             </td>
 
                             {/* Direct Actions control cabinet */}

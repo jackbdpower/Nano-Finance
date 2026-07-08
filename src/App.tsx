@@ -131,11 +131,42 @@ export default function App() {
 
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
 
-  // Global window.alert override to display custom React alerts inside iframe sandbox
+  // Global window.alert override and app code copying/inspection protection
   useEffect(() => {
     window.alert = (message: any) => {
       const msgStr = typeof message === 'string' ? message : JSON.stringify(message);
       setAlertMessage(msgStr);
+    };
+
+    // 1. Disable Right Click (Context Menu) to prevent Inspect Element
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+    document.addEventListener('contextmenu', handleContextMenu);
+
+    // 2. Disable DevTools keys (F12, Ctrl+Shift+I, Ctrl+Shift+C, Ctrl+Shift+J, Ctrl+U)
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        e.key === 'F12' ||
+        (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'C' || e.key === 'c' || e.key === 'J' || e.key === 'j')) ||
+        (e.ctrlKey && (e.key === 'U' || e.key === 'u' || e.key === 'S' || e.key === 's'))
+      ) {
+        e.preventDefault();
+        return false;
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+
+    // 3. Prevent text selection and drag start programmatically to make it feel like a secure native app
+    const handleDragStart = (e: DragEvent) => {
+      e.preventDefault();
+    };
+    document.addEventListener('dragstart', handleDragStart);
+
+    return () => {
+      document.removeEventListener('contextmenu', handleContextMenu);
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('dragstart', handleDragStart);
     };
   }, []);
 
@@ -262,8 +293,11 @@ export default function App() {
         body: JSON.stringify({ phone }),
       });
       
-      if (response.status === 404 || response.status === 401) {
-        console.warn("User session is inactive or deleted on backend. Logging out.");
+      if (response.status === 404 || response.status === 401 || response.status === 403) {
+        console.warn("User session is inactive, deleted, or blocked on backend. Logging out.");
+        if (response.status === 403) {
+          setAlertMessage("আপনার অ্যাকাউন্টটি অ্যাডমিন কর্তৃক ব্লক করা হয়েছে। অনুগ্রহ করে কর্তৃপক্ষের সাথে যোগাযোগ করুন।");
+        }
         handleLogout();
         return;
       }

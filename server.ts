@@ -1233,6 +1233,9 @@ app.post("/api/user/get-state", (req, res) => {
   if (!user) {
     return res.status(404).json({ error: "User profile not found", expired: true });
   }
+  if (user.isBlocked) {
+    return res.status(403).json({ error: "আপনার অ্যাকাউন্টটি ব্লক করা হয়েছে।", blocked: true });
+  }
   res.json({ success: true, user });
 });
 
@@ -1259,6 +1262,10 @@ app.post("/api/user/login", (req, res) => {
   let user = db.users.find((u: any) => u.phone === phone);
   if (!user) {
     return res.status(401).json({ error: "মোবাইল নম্বরটি নিবন্ধিত নয়। অনুগ্রহ করে রেজিস্ট্রেশন করুন।" });
+  }
+
+  if (user.isBlocked) {
+    return res.status(403).json({ error: "আপনার অ্যাকাউন্টটি অ্যাডমিন কর্তৃক ব্লক করা হয়েছে। অনুগ্রহ করে কর্তৃপক্ষের সাথে যোগাযোগ করুন।" });
   }
 
   // 2. Perform PIN verification
@@ -2766,7 +2773,8 @@ app.post("/api/admin/user/update", async (req, res) => {
     adminDisburseNumber,
     adminDisburseMethod,
     adminNotesText,
-    adminWhatsapp
+    adminWhatsapp,
+    isBlocked
   } = req.body;
   if (!adminPhone || !userPhone) {
     return res.status(400).json({ error: "অ্যাডমিন ও গ্রাহকের মোবাইল নম্বর প্রয়োজন।" });
@@ -2862,6 +2870,9 @@ app.post("/api/admin/user/update", async (req, res) => {
 
     if (isVerified !== undefined) {
       db.users[userIdx].isVerified = Boolean(isVerified);
+    }
+    if (isBlocked !== undefined) {
+      db.users[userIdx].isBlocked = Boolean(isBlocked);
     }
     if (savingsBalance !== undefined) {
       const oldBal = Number(db.users[userIdx].savingsBalance || 0);
