@@ -6,14 +6,17 @@ import './index.css';
 // Intercept relative fetch calls inside Capacitor to point to the live hosted API
 const isCapacitor = 
   typeof window !== 'undefined' && 
-  (window.location.origin.startsWith('capacitor://') || 
-   (window.location.origin.startsWith('http://localhost') && !window.location.origin.includes(':3000')));
+  (!!(window as any).Capacitor ||
+   window.location.origin.startsWith('capacitor://') || 
+   (window.location.origin.startsWith('http://localhost') && !window.location.origin.includes(':3000')) ||
+   (window.location.origin.startsWith('https://localhost') && !window.location.origin.includes(':3000')));
 
 if (isCapacitor) {
   const originalFetch = window.fetch;
-  const API_BASE_URL = 'https://ais-pre-hq7bwrbsqfopadiy563m4v-579837712170.asia-southeast1.run.app';
   window.fetch = function (input, init) {
     if (typeof input === 'string' && input.startsWith('/api/')) {
+      const savedUrl = localStorage.getItem('custom_api_url');
+      const API_BASE_URL = savedUrl ? savedUrl.trim() : 'https://nano-finance-5bml.onrender.com';
       return originalFetch(`${API_BASE_URL}${input}`, init);
     }
     return originalFetch(input, init);

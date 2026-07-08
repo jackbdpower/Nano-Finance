@@ -20,6 +20,11 @@ export default function LoginScreen({ onLoginSuccess, initialPhone = '', setting
   const appName = settings?.appName || 'ন্যানো-ফাইন্যান্স';
   const [isRegisterMode, setIsRegisterMode] = useState(false);
 
+  // Developer / Server settings states
+  const [logoClicks, setLogoClicks] = useState(0);
+  const [showDevModal, setShowDevModal] = useState(false);
+  const [devUrlInput, setDevUrlInput] = useState('');
+
   // Login states
   const [phone, setPhone] = useState(initialPhone && initialPhone !== '01712345678' ? initialPhone : '');
   const [pin, setPin] = useState('');
@@ -192,7 +197,19 @@ export default function LoginScreen({ onLoginSuccess, initialPhone = '', setting
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center pt-6 pb-2 shrink-0">
-          <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-[#c5a059] to-[#8c6b2d] rounded-xl shadow-md mb-3">
+          <div 
+            onClick={() => {
+              const nextClicks = logoClicks + 1;
+              setLogoClicks(nextClicks);
+              if (nextClicks >= 5) {
+                setLogoClicks(0);
+                const currentUrl = localStorage.getItem('custom_api_url') || 'https://nano-finance-5bml.onrender.com';
+                setDevUrlInput(currentUrl);
+                setShowDevModal(true);
+              }
+            }}
+            className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-[#c5a059] to-[#8c6b2d] rounded-xl shadow-md mb-3 cursor-pointer select-none active:scale-95 transition-transform"
+          >
             <Landmark className="w-6 h-6 text-zinc-950" />
           </div>
           <span className="text-[#c5a059] text-[9px] uppercase tracking-[0.25em] font-semibold mb-1 block italic">Curated Quality</span>
@@ -631,6 +648,68 @@ export default function LoginScreen({ onLoginSuccess, initialPhone = '', setting
           © ২০২৬ {appName} লিমিটেড | সর্বস্বত্ব সংরক্ষিত
         </span>
       </div>
+
+      {/* Developer / Server Settings Modal */}
+      {showDevModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md select-none">
+          <div className="bg-[#111113] border border-zinc-800 rounded-2xl p-6 w-full max-w-sm shadow-2xl flex flex-col">
+            <h3 className="text-sm font-bold text-[#c5a059] font-sans mb-2 flex items-center gap-2">
+              🔧 সার্ভার ডোমেইন সেটিংস (API Domain)
+            </h3>
+            <p className="text-[11px] text-zinc-400 mb-4 leading-normal">
+              আপনার অ্যাপটি যে লাইভ সার্ভার বা ডোমেইনের সাথে কানেক্ট হবে তা পরিবর্তন করতে পারেন। খালি রাখলে বা রিসেট করলে ডিফল্ট সার্ভারে কানেক্ট হবে।
+            </p>
+            <div className="flex flex-col gap-1 mb-5">
+              <label className="text-[10px] font-semibold text-zinc-500">সার্ভার ইউআরএল (Server URL)</label>
+              <input
+                type="url"
+                value={devUrlInput}
+                onChange={(e) => setDevUrlInput(e.target.value)}
+                placeholder="https://example.com"
+                className="w-full bg-[#161618] border border-zinc-800 focus:border-[#c5a059]/40 rounded-xl py-2.5 px-3.5 text-xs font-mono text-zinc-200 focus:outline-none transition-all"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  let cleaned = devUrlInput.trim();
+                  if (cleaned && !cleaned.startsWith('http://') && !cleaned.startsWith('https://')) {
+                    cleaned = 'https://' + cleaned;
+                  }
+                  if (cleaned.endsWith('/')) {
+                    cleaned = cleaned.slice(0, -1);
+                  }
+                  localStorage.setItem('custom_api_url', cleaned);
+                  setShowDevModal(false);
+                  window.location.reload();
+                }}
+                className="w-full bg-[#c5a059] hover:bg-[#dfc187] active:scale-[0.98] text-zinc-950 py-2.5 rounded-xl font-bold font-sans text-xs transition-all cursor-pointer text-center"
+              >
+                সংরক্ষণ ও রিলোড (Save & Reload)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  localStorage.removeItem('custom_api_url');
+                  setShowDevModal(false);
+                  window.location.reload();
+                }}
+                className="w-full bg-zinc-900 hover:bg-zinc-800 text-zinc-300 py-2.5 rounded-xl font-bold font-sans text-xs transition-all cursor-pointer text-center border border-zinc-800"
+              >
+                রিসেট করুন (Reset to Default)
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowDevModal(false)}
+                className="w-full bg-transparent hover:text-white text-zinc-500 py-1.5 rounded-xl font-semibold font-sans text-xs transition-all cursor-pointer text-center"
+              >
+                বাতিল (Cancel)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
