@@ -5,7 +5,7 @@ import fs from "fs";
 import crypto from "crypto";
 import { createServer as createViteServer } from "vite";
 import { initializeApp } from "firebase/app";
-import { initializeFirestore, doc, getDoc, setDoc, setLogLevel, terminate } from "firebase/firestore";
+import { initializeFirestore, doc, getDoc, setDoc, setLogLevel, terminate, deleteDoc } from "firebase/firestore";
 import { createClient } from "@supabase/supabase-js";
 
 const app = express();
@@ -2050,6 +2050,47 @@ app.get("/api/loan-document/:loanId/:field", async (req, res) => {
   return res.redirect(fallback);
 });
 
+// Helper to delete associated document files and Firestore backups of a loan
+async function deleteLoanDocuments(loanId: string) {
+  if (!loanId) return;
+
+  // 1. Delete from Cloud Firestore "nano_finance_docs"
+  if (firebaseDb && !quotaExhausted) {
+    const fields = ["nidFront", "nidBack", "selfie", "incomeProof", "addressProof"];
+    try {
+      // Delete separate documents
+      for (const field of fields) {
+        const docRef = doc(firebaseDb, "nano_finance_docs", `loan_${loanId}_${field}`);
+        await deleteDoc(docRef).catch(err => console.error(`[Cleanup] Failed to delete Firestore doc for ${loanId} ${field}:`, err));
+      }
+      // Delete legacy aggregated document
+      const legacyDocRef = doc(firebaseDb, "nano_finance_docs", `loan_${loanId}`);
+      await deleteDoc(legacyDocRef).catch(err => console.error(`[Cleanup] Failed to delete legacy Firestore doc for ${loanId}:`, err));
+      console.log(`[Cleanup] Deleted all Cloud Firestore document backups for loan ${loanId}.`);
+    } catch (err) {
+      console.error(`[Cleanup] Error during Cloud Firestore deletion for loan ${loanId}:`, err);
+    }
+  }
+
+  // 2. Delete local files from UPLOADS_DIR
+  try {
+    if (fs.existsSync(UPLOADS_DIR)) {
+      const files = fs.readdirSync(UPLOADS_DIR);
+      const prefix = `loan_${loanId}_`;
+      const targetFiles = files.filter(f => f.startsWith(prefix));
+      for (const file of targetFiles) {
+        const filePath = path.join(UPLOADS_DIR, file);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      }
+      console.log(`[Cleanup] Deleted all local files for loan ${loanId}.`);
+    }
+  } catch (err) {
+    console.error(`[Cleanup] Error during local file deletion for loan ${loanId}:`, err);
+  }
+}
+
 // API: Apply for a Micro-Loan with File/Base64 cloud saving
 app.post("/api/user/loan/apply", async (req, res) => {
   const { 
@@ -2792,7 +2833,17 @@ app.post("/api/admin/user/update", async (req, res) => {
   }
 
   if (isDelete) {
+    const deletedUser = db.users[userIdx];
     db.users.splice(userIdx, 1);
+    
+    // Auto-clean all document images of all loans belonging to this deleted user
+    if (deletedUser && Array.isArray(deletedUser.activeLoans)) {
+      for (const loan of deletedUser.activeLoans) {
+        if (loan.id) {
+          deleteLoanDocuments(loan.id).catch(err => console.error("[Cleanup] error deleting loan docs for deleted user:", err));
+        }
+      }
+    }
   } else {
     const user = db.users[userIdx];
     if (req.body.customNotification) {
@@ -3026,6 +3077,8 @@ app.post("/api/admin/user/loan/update", async (req, res) => {
   const user = db.users[userIdx];
   if (action === "delete") {
     user.activeLoans = (user.activeLoans || []).filter((l: any) => l.id !== loanId);
+    // Auto-clean documents on deletion of activeLoans
+    deleteLoanDocuments(loanId).catch(err => console.error("[Cleanup] error deleting loan docs:", err));
   } else if (action === "add_loan") {
     const loanAmt = Number(amount) || 10000;
     const loanMths = Number(months) || 12;
