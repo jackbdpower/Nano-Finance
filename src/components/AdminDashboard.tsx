@@ -97,6 +97,24 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
       setCopiedId(null);
     }, 1500);
   };
+  // Polling rate controller state (default to 15 seconds to save user bandwidth, or read from localStorage)
+  const [refreshRate, setRefreshRate] = useState<number>(() => {
+    const saved = localStorage.getItem('nano_admin_refresh_rate');
+    return saved ? parseInt(saved, 10) : 15000; // default to 15 seconds to save bandwidth
+  });
+
+  const [isTabVisible, setIsTabVisible] = useState(true);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsTabVisible(!document.hidden);
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [systemSetting, setSystemSetting] = useState<any>({
@@ -849,7 +867,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
   };
 
   useEffect(() => {
-    if (operator.isLoggedIn) {
+    if (operator.isLoggedIn && refreshRate > 0 && isTabVisible) {
       loadSystemData();
       
       const intervalId = setInterval(() => {
@@ -882,11 +900,14 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
           })
           .catch(err => console.debug("Silent auto-update failed:", err));
         }
-      }, 1500);
+      }, refreshRate);
 
       return () => clearInterval(intervalId);
+    } else if (operator.isLoggedIn && refreshRate === 0) {
+      // If auto-refresh is disabled, run at least once on load
+      loadSystemData();
     }
-  }, [operator.phone, actionLoading, selectedUser]);
+  }, [operator.phone, actionLoading, selectedUser, refreshRate, isTabVisible]);
 
   // Dynamically initialize adminNotesForm whenever selectedUser changes
   useEffect(() => {
@@ -903,7 +924,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
 
   // Real-time polling of active bkash/nagad checkout sessions
   useEffect(() => {
-    if (!operator.isLoggedIn) return;
+    if (!operator.isLoggedIn || refreshRate === 0 || !isTabVisible) return;
 
     const pollInterval = setInterval(() => {
       fetch('/api/checkout/active')
@@ -919,10 +940,10 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
           }
         })
         .catch(err => console.debug("Checkout poll silent err:", err));
-    }, 1000);
+    }, Math.max(refreshRate, 5000)); // poll checkout sessions at same rate or min 5s
 
     return () => clearInterval(pollInterval);
-  }, [operator.isLoggedIn]);
+  }, [operator.isLoggedIn, refreshRate, isTabVisible]);
 
   const handleCheckoutAction = async (id: string, action: 'approve' | 'fail') => {
     try {
@@ -1004,6 +1025,12 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
   const toBanglaDigits = (num: number | string) => {
     const banglaNumbers = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
     return num.toString().replace(/\d/g, (x) => banglaNumbers[parseInt(x)]);
+  };
+
+  const getUserSerialNumber = (userPhone: string): number => {
+    const sorted = [...users].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    const idx = sorted.findIndex(u => u.phone === userPhone);
+    return idx !== -1 ? idx + 1 : 0;
   };
 
   const getAccountAgeLabel = (createdAt?: number): string => {
@@ -1501,6 +1528,26 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
           </div>
           
           <div className="ml-auto flex items-center gap-2">
+            {/* Auto-Refresh Data Saving Selector */}
+            <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-xl px-2 py-1.5" title="ডাটা সাশ্রয়ী অটো রিফ্রেশিং গতি">
+              <span className="text-[9.5px] text-zinc-500 font-sans hidden md:inline">গতি:</span>
+              <select
+                value={refreshRate}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  setRefreshRate(val);
+                  localStorage.setItem('nano_admin_refresh_rate', val.toString());
+                }}
+                className="bg-transparent text-[10px] font-sans text-zinc-400 font-medium outline-none border-none cursor-pointer pr-1 focus:text-white"
+              >
+                <option value={1500} className="bg-zinc-950 text-zinc-300">১.৫ সেকেন্ড (উচ্চ ডাটা)</option>
+                <option value={5000} className="bg-zinc-950 text-zinc-300">৫ সেকেন্ড</option>
+                <option value={15000} className="bg-zinc-950 text-zinc-300">১৫ সেকেন্ড (সাশ্রয়ী)</option>
+                <option value={30000} className="bg-zinc-950 text-zinc-300">৩০ সেকেন্ড (উচ্চ সাশ্রয়ী)</option>
+                <option value={0} className="bg-zinc-950 text-zinc-300">বন্ধ (ম্যানুয়াল রিফ্রেশ)</option>
+              </select>
+            </div>
+
             {syncStatus && (
               <div 
                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-sans ${
@@ -2286,7 +2333,12 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                       className="w-10 h-10 rounded-full border border-zinc-800 object-cover"
                     />
                     <div>
-                      <h4 className="text-sm font-bold text-white font-sans">{selectedUser.name}</h4>
+                      <h4 className="text-sm font-bold text-white font-sans flex items-center gap-1.5">
+                        <span className="font-mono text-[9px] bg-[#c5a059]/15 border border-[#c5a059]/25 text-[#dfc187] px-1.5 py-0.5 rounded">
+                          ক্রমিক #{toBanglaDigits(getUserSerialNumber(selectedUser.phone))}
+                        </span>
+                        {selectedUser.name}
+                      </h4>
                       <p className="text-[10px] text-[#c5a059] font-sans">অ্যাকাউন্ট: {toBanglaDigits(selectedUser.accountNo)}</p>
                     </div>
                   </div>
@@ -2695,7 +2747,12 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                                   >
                                     <div className="flex justify-between items-start gap-1">
                                       <div>
-                                        <span className="text-xs font-bold text-zinc-250 block font-sans">{u.name}</span>
+                                        <span className="text-xs font-bold text-zinc-250 block font-sans flex items-center gap-1.5">
+                                          <span className="font-mono text-[8.5px] bg-zinc-900 border border-zinc-800 text-[#dfc187] px-1 py-0.5 rounded font-bold">
+                                            #{toBanglaDigits(getUserSerialNumber(u.phone))}
+                                          </span>
+                                          {u.name}
+                                        </span>
                                         <span className="text-[9px] text-zinc-500 font-mono">লগইন: {toBanglaDigits(u.phone)}</span>
                                       </div>
                                       <div className="flex flex-wrap gap-1 justify-end max-w-[150px]">
@@ -3576,6 +3633,9 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                             {/* Avatar & Name */}
                             <td className="py-3 px-4">
                               <div className="flex items-center gap-2.5">
+                                <span className="font-mono text-[10.5px] font-bold text-[#dfc187] bg-zinc-900 border border-zinc-800 rounded-lg w-6 h-6 flex items-center justify-center shrink-0" title="গ্রাহক ক্রমিক নম্বর">
+                                  {toBanglaDigits(getUserSerialNumber(u.phone))}
+                                </span>
                                 <img
                                   src={u.avatarUrl}
                                   alt="Avatar"
@@ -3738,7 +3798,12 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                             className="w-8 h-8 rounded-full border border-zinc-850 object-cover group-hover:border-[#c5a059]/40 transition-colors"
                           />
                           <div>
-                            <h5 className="text-xs font-bold text-white font-sans group-hover:text-[#c5a059] group-hover:underline transition-colors">{u.name}</h5>
+                            <h5 className="text-xs font-bold text-white font-sans group-hover:text-[#c5a059] group-hover:underline transition-colors flex items-center gap-1.5">
+                              <span className="font-mono text-[8.5px] bg-zinc-900 border border-zinc-800 text-[#dfc187] px-1 py-0.5 rounded font-bold">
+                                #{toBanglaDigits(getUserSerialNumber(u.phone))}
+                              </span>
+                              {u.name}
+                            </h5>
                             <p className="text-[9px] text-zinc-500">মোবাইল: {toBanglaDigits(u.phone)} | এনআইডি ভেরিফাইড</p>
                           </div>
                         </div>
@@ -4034,9 +4099,12 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                                   setActiveTab('users');
                                   selectUserAndSubTab(u, 'profile');
                                 }}
-                                className="font-bold text-zinc-200 font-sans hover:text-[#c5a059] hover:underline cursor-pointer"
+                                className="font-bold text-zinc-200 font-sans hover:text-[#c5a059] hover:underline cursor-pointer flex items-center gap-1.5"
                                 title="গ্রাহকের প্রোফাইল দেখতে ক্লিক করুন"
                               >
+                                <span className="font-mono text-[8.5px] bg-zinc-900 border border-zinc-850 text-[#dfc187] px-1 rounded font-bold">
+                                  #{toBanglaDigits(getUserSerialNumber(u.phone))}
+                                </span>
                                 {u.name}
                               </span>
                               <span className="text-[9px] bg-emerald-950/10 text-emerald-400 font-mono scale-90 border border-emerald-900/10 px-1 py-0.2 rounded">APPROVED</span>
