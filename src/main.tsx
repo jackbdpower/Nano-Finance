@@ -1,6 +1,6 @@
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
-import App from './AppUser.tsx';
+import App from './App.tsx';
 import './index.css';
 
 // Intercept relative fetch calls inside Capacitor to point to the live hosted API

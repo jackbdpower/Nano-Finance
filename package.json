@@ -6,13 +6,10 @@
   "scripts": {
     "dev": "tsx server.ts",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
-    "build:admin": "VITE_APP_TYPE=admin vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit",
-    "cap:sync": "vite build && npx cap sync",
-    "cap:open": "npx cap open android"
+    "lint": "tsc --noEmit"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.1",
@@ -38,8 +35,6 @@
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.25.0",
-    "javascript-obfuscator": "^5.4.7",
-    "rollup-plugin-javascript-obfuscator": "^1.0.4",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
