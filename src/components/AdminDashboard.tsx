@@ -59,6 +59,27 @@ async function safeJsonParse(response: Response): Promise<any> {
   }
 }
 
+async function adminFetch(url: string, options: RequestInit = {}): Promise<any> {
+  const sessionToken = typeof localStorage !== 'undefined' ? localStorage.getItem('jf_session_token') : null;
+  const headers = new Headers(options.headers || {});
+  if (!headers.has('Content-Type') && options.body) {
+    headers.set('Content-Type', 'application/json');
+  }
+  if (sessionToken && !headers.has('x-session-token')) {
+    headers.set('x-session-token', sessionToken);
+  }
+  if (sessionToken && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${sessionToken}`);
+  }
+  try {
+    const response = await fetch(url, { ...options, headers, credentials: 'include' });
+    return await safeJsonParse(response);
+  } catch (err) {
+    console.warn("adminFetch error for " + url, err);
+    return { success: false, error: "সার্ভারে সংযোগ করা যাচ্ছে না।" };
+  }
+}
+
 function formatBanglaPhoneNumber(value: string): string {
   let cleaned = value.replace(/[^0-9]/g, '');
   if (cleaned.length > 11) {
@@ -325,13 +346,11 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
   const loadSystemData = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/admin/get-all-data', {
+      const data = await adminFetch('/api/admin/get-all-data', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ adminPhone: operator.phone })
       });
-      const data = await safeJsonParse(response);
-      if (response.ok && data.success) {
+      if (data && data.success) {
         setSystemSetting(data.settings);
         setSettingsForm({
           appName: data.settings.appName,
@@ -430,9 +449,8 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
     }
     setActionLoading(true);
     try {
-      const response = await fetch('/api/admin/user/create', {
+      const data = await adminFetch('/api/admin/user/create', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           adminPhone: operator.phone,
           name: createUserForm.name,
@@ -442,8 +460,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
           isVerified: createUserForm.isVerified
         })
       });
-      const data = await safeJsonParse(response);
-      if (response.ok && data.success) {
+      if (data && data.success) {
         setUsers(data.users);
         setShowCreateUserModal(false);
         setCreateUserForm({ name: '', phone: '', pin: '', savingsBalance: 0, isVerified: true });
@@ -466,9 +483,8 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
     if (!selectedUser) return;
     setActionLoading(true);
     try {
-      const response = await fetch('/api/admin/user/update', {
+      const data = await adminFetch('/api/admin/user/update', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           adminPhone: operator.phone,
           userPhone: selectedUser.phone,
@@ -484,8 +500,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
           permanentAddress: editUserForm.permanentAddress
         })
       });
-      const data = await safeJsonParse(response);
-      if (response.ok && data.success) {
+      if (data && data.success) {
         setUsers(data.users);
         setIsEditingUser(false);
         const updated = data.users.find((u: any) => u.phone === editUserForm.phone || u.phone === selectedUser.phone);
@@ -510,9 +525,8 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
     if (!selectedUser) return;
     setActionLoading(true);
     try {
-      const response = await fetch('/api/admin/user/update', {
+      const data = await adminFetch('/api/admin/user/update', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           adminPhone: operator.phone,
           userPhone: selectedUser.phone,
@@ -523,8 +537,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
           adminWhatsapp: adminNotesForm.adminWhatsapp
         })
       });
-      const data = await safeJsonParse(response);
-      if (response.ok && data.success) {
+      if (data && data.success) {
         setUsers(data.users);
         const updated = data.users.find((u: any) => u.phone === selectedUser.phone);
         if (updated) {
@@ -552,17 +565,15 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
     }
     setActionLoading(true);
     try {
-      const response = await fetch('/api/admin/user/transaction/add', {
+      const data = await adminFetch('/api/admin/user/transaction/add', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           adminPhone: operator.phone,
           userPhone: selectedUser.phone,
           ...newTxForm
         })
       });
-      const data = await safeJsonParse(response);
-      if (response.ok && data.success) {
+      if (data && data.success) {
         setUsers(data.users);
         setShowAddTxForm(false);
         setNewTxForm({
@@ -593,9 +604,8 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
     if (!selectedUser) return;
     setActionLoading(true);
     try {
-      const response = await fetch('/api/admin/user/transaction/update', {
+      const data = await adminFetch('/api/admin/user/transaction/update', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           adminPhone: operator.phone,
           userPhone: selectedUser.phone,
@@ -603,8 +613,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
           ...editingTxForm
         })
       });
-      const data = await safeJsonParse(response);
-      if (response.ok && data.success) {
+      if (data && data.success) {
         setUsers(data.users);
         setEditingTxId(null);
         const updated = data.users.find((u: any) => u.phone === selectedUser.phone);
@@ -630,9 +639,8 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
       async () => {
         setActionLoading(true);
         try {
-          const response = await fetch('/api/admin/user/transaction/update', {
+          const data = await adminFetch('/api/admin/user/transaction/update', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               adminPhone: operator.phone,
               userPhone: selectedUser.phone,
@@ -640,8 +648,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
               action: 'delete'
             })
           });
-          const data = await safeJsonParse(response);
-          if (response.ok && data.success) {
+          if (data && data.success) {
             setUsers(data.users);
             const updated = data.users.find((u: any) => u.phone === selectedUser.phone);
             if (updated) setSelectedUser(updated);
@@ -669,9 +676,8 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
     }
     setActionLoading(true);
     try {
-      const response = await fetch('/api/admin/user/loan/update', {
+      const data = await adminFetch('/api/admin/user/loan/update', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           adminPhone: operator.phone,
           userPhone: selectedUser.phone,
@@ -679,8 +685,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
           ...newLoanForm
         })
       });
-      const data = await safeJsonParse(response);
-      if (response.ok && data.success) {
+      if (data && data.success) {
         setUsers(data.users);
         setShowAddLoanForm(false);
         setNewLoanForm({
@@ -721,13 +726,11 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
       if (customEmis) {
         payload.emiInstallments = customEmis;
       }
-      const response = await fetch('/api/admin/user/loan/update', {
+      const data = await adminFetch('/api/admin/user/loan/update', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      const data = await safeJsonParse(response);
-      if (response.ok && data.success) {
+      if (data && data.success) {
         setUsers(data.users);
         setEditingLoanId(null);
         const updated = data.users.find((u: any) => u.phone === selectedUser.phone);
@@ -754,9 +757,8 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
     }
     setActionLoading(true);
     try {
-      const response = await fetch('/api/admin/user/loan/update', {
+      const data = await adminFetch('/api/admin/user/loan/update', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           adminPhone: operator.phone,
           userPhone: userPhone,
@@ -769,8 +771,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
           adminWhatsapp: notes.adminWhatsapp
         })
       });
-      const data = await safeJsonParse(response);
-      if (response.ok && data.success) {
+      if (data && data.success) {
         setUsers(data.users);
         alert('অ্যাডমিন নোটস ও কন্ট্রোল তথ্য সফলভাবে সংরক্ষণ করা হয়েছে!');
         loadSystemData();
@@ -795,9 +796,8 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
       async () => {
         setActionLoading(true);
         try {
-          const response = await fetch('/api/admin/user/loan/update', {
+          const data = await adminFetch('/api/admin/user/loan/update', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               adminPhone: operator.phone,
               userPhone: selectedUser.phone,
@@ -805,8 +805,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
               action: 'delete'
             })
           });
-          const data = await safeJsonParse(response);
-          if (response.ok && data.success) {
+          if (data && data.success) {
             setUsers(data.users);
             const updated = data.users.find((u: any) => u.phone === selectedUser.phone);
             if (updated) setSelectedUser(updated);
@@ -835,9 +834,8 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
     }
     setActionLoading(true);
     try {
-      const response = await fetch('/api/admin/user/update', {
+      const data = await adminFetch('/api/admin/user/update', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           adminPhone: operator.phone,
           userPhone: selectedUser.phone,
@@ -848,8 +846,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
           }
         })
       });
-      const data = await safeJsonParse(response);
-      if (response.ok && data.success) {
+      if (data && data.success) {
         setUsers(data.users);
         setNewNoticeForm({ title: '', body: '', type: 'info' });
         const updated = data.users.find((u: any) => u.phone === selectedUser.phone);
@@ -872,21 +869,17 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
       
       const intervalId = setInterval(() => {
         if (!actionLoading) {
-          fetch('/api/admin/get-all-data', {
+          adminFetch('/api/admin/get-all-data', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ adminPhone: operator.phone })
           })
-          .then(res => safeJsonParse(res))
           .then(data => {
-            if (data.success) {
+            if (data && data.success) {
               setSystemSetting(data.settings);
               setUsers(prevUsers => {
-                // If a user is currently selected, update their selected state reference too
                 if (selectedUser) {
                   const currentSelected = data.users.find((u: any) => u.phone === selectedUser.phone);
                   if (currentSelected) {
-                    // Update selectedUser without breaking subtab states
                     setSelectedUser(currentSelected);
                   }
                 }
@@ -904,7 +897,6 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
 
       return () => clearInterval(intervalId);
     } else if (operator.isLoggedIn && refreshRate === 0) {
-      // If auto-refresh is disabled, run at least once on load
       loadSystemData();
     }
   }, [operator.phone, actionLoading, selectedUser, refreshRate, isTabVisible]);
@@ -927,10 +919,9 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
     if (!operator.isLoggedIn || refreshRate === 0 || !isTabVisible) return;
 
     const pollInterval = setInterval(() => {
-      fetch('/api/checkout/active')
-        .then(res => safeJsonParse(res))
+      adminFetch('/api/checkout/active')
         .then(data => {
-          if (data.success) {
+          if (data && data.success) {
             if (data.activeCheckouts) {
               setActiveCheckouts(data.activeCheckouts);
             }
@@ -940,23 +931,19 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
           }
         })
         .catch(err => console.debug("Checkout poll silent err:", err));
-    }, Math.max(refreshRate, 5000)); // poll checkout sessions at same rate or min 5s
+    }, Math.max(refreshRate, 5000));
 
     return () => clearInterval(pollInterval);
   }, [operator.isLoggedIn, refreshRate, isTabVisible]);
 
   const handleCheckoutAction = async (id: string, action: 'approve' | 'fail') => {
     try {
-      const response = await fetch('/api/checkout/admin-action', {
+      const data = await adminFetch('/api/checkout/admin-action', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, action })
       });
-      const data = await safeJsonParse(response);
-      if (data.success) {
-        // Optimistically filter from the active list
+      if (data && data.success) {
         setActiveCheckouts(prev => prev.filter(c => c.id !== id));
-        // Refresh master statistics dashboard data silently
         loadSystemData();
       } else {
         alert(data.error || 'অ্যাকশন সম্পন্ন করতে ব্যর্থ হয়েছে।');
@@ -973,15 +960,11 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
       'আপনি কি পূর্ববর্তী পেমেন্ট চেষ্টার সব ইতিহাস মুছে ফেলতে চান?',
       async () => {
         try {
-          const response = await fetch('/api/checkout/clear-history', {
+          const data = await adminFetch('/api/checkout/clear-history', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
             body: JSON.stringify({ adminPhone: operator.phone })
           });
-          const data = await safeJsonParse(response);
-          if (response.ok && data.success) {
+          if (data && data.success) {
             setCheckoutHistory([]);
             alert('পেমেন্ট ইতিহাস সম্পূর্ণ মুছে ফেলা হয়েছে!');
           } else {
@@ -1001,15 +984,11 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
       'আপনি কি এই পেমেন্ট রেকর্ডটি মুছে ফেলতে চান?',
       async () => {
         try {
-          const response = await fetch('/api/checkout/delete-history-item', {
+          const data = await adminFetch('/api/checkout/delete-history-item', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
             body: JSON.stringify({ id })
           });
-          const data = await safeJsonParse(response);
-          if (response.ok && data.success) {
+          if (data && data.success) {
             setCheckoutHistory(prev => prev.filter(c => c.id !== id));
             alert('রেকর্ডটি সফলভাবে মুছে ফেলা হয়েছে!');
           } else {
@@ -1100,9 +1079,8 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
 
     setActionLoading(true);
     try {
-      const response = await fetch('/api/admin/sub-admin/save', {
+      const data = await adminFetch('/api/admin/sub-admin/save', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           adminPhone: operator.phone,
           name: subAdminForm.name,
@@ -1113,8 +1091,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
           oldPhone: subAdminForm.oldPhone
         })
       });
-      const data = await safeJsonParse(response);
-      if (response.ok && data.success) {
+      if (data && data.success) {
         setSubAdmins(data.subAdmins || []);
         if (data.mainAdmins) {
           setMainAdmins(data.mainAdmins);
@@ -1157,16 +1134,14 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
       async () => {
         setActionLoading(true);
         try {
-          const response = await fetch('/api/admin/sub-admin/delete', {
+          const data = await adminFetch('/api/admin/sub-admin/delete', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               adminPhone: operator.phone,
               phone: phone
             })
           });
-          const data = await safeJsonParse(response);
-          if (response.ok && data.success) {
+          if (data && data.success) {
             setSubAdmins(data.subAdmins || []);
             if (data.mainAdmins) {
               setMainAdmins(data.mainAdmins);
@@ -1190,16 +1165,14 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
     e.preventDefault();
     setActionLoading(true);
     try {
-      const response = await fetch('/api/admin/settings/update', {
+      const data = await adminFetch('/api/admin/settings/update', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           adminPhone: operator.phone,
           settings: settingsForm
         })
       });
-      const data = await safeJsonParse(response);
-      if (response.ok && data.success) {
+      if (data && data.success) {
         setSystemSetting(data.settings);
         alert('ওয়েবসাইট কনফিগারেশন সেটিংস সফলভাবে আপডেট হয়েছে!');
         onStateUpdated(); // Trigger root reload so layout name updates instantly
@@ -1217,16 +1190,14 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
   const handlePruneData = async () => {
     setActionLoading(true);
     try {
-      const response = await fetch('/api/admin/clear-data', {
+      const data = await adminFetch('/api/admin/clear-data', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           adminPhone: operator.phone,
           pruneOption: selectedPruneOption
         })
       });
-      const data = await safeJsonParse(response);
-      if (response.ok && data.success) {
+      if (data && data.success) {
         setPruneResult(data.clearedCounts);
         alert(`ডাটাবেজ ছাঁটাই সম্পন্ন হয়েছে!\n\nমুছে ফেলা তথ্য:\n- ট্রানজেকশন: ${data.clearedCounts.transactions} টি\n- অনলাইন চেকআউট সেশন: ${data.clearedCounts.checkouts} টি\n- সিকিউরিটি লগ: ${data.clearedCounts.securityLogs} টি\n- নোটিফিকেশন: ${data.clearedCounts.notifications} টি`);
         setShowPruneConfirm(false);
@@ -1246,17 +1217,15 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
   const handleToggleVerification = async (userPhone: string, currentStatus: boolean) => {
     setActionLoading(true);
     try {
-      const response = await fetch('/api/admin/user/update', {
+      const data = await adminFetch('/api/admin/user/update', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           adminPhone: operator.phone,
           userPhone: userPhone,
           isVerified: !currentStatus
         })
       });
-      const data = await safeJsonParse(response);
-      if (response.ok && data.success) {
+      if (data && data.success) {
         setUsers(data.users);
         if (selectedUser?.phone === userPhone) {
           setSelectedUser({ ...selectedUser, isVerified: !currentStatus });
@@ -1276,17 +1245,15 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
   const handleToggleBlock = async (userPhone: string, currentBlockedStatus: boolean) => {
     setActionLoading(true);
     try {
-      const response = await fetch('/api/admin/user/update', {
+      const data = await adminFetch('/api/admin/user/update', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           adminPhone: operator.phone,
           userPhone: userPhone,
           isBlocked: !currentBlockedStatus
         })
       });
-      const data = await safeJsonParse(response);
-      if (response.ok && data.success) {
+      if (data && data.success) {
         setUsers(data.users);
         if (selectedUser?.phone === userPhone) {
           setSelectedUser({ ...selectedUser, isBlocked: !currentBlockedStatus });
@@ -1307,17 +1274,15 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
     if (!selectedUser) return;
     setActionLoading(true);
     try {
-      const response = await fetch('/api/admin/user/update', {
+      const data = await adminFetch('/api/admin/user/update', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           adminPhone: operator.phone,
           userPhone: selectedUser.phone,
           savingsBalance: adjustBalanceVal
         })
       });
-      const data = await safeJsonParse(response);
-      if (response.ok && data.success) {
+      if (data && data.success) {
         setUsers(data.users);
         const updatedUser = data.users.find((u: any) => u.phone === selectedUser.phone);
         setSelectedUser(updatedUser);
@@ -1341,17 +1306,15 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
       async () => {
         setActionLoading(true);
         try {
-          const response = await fetch('/api/admin/user/update', {
+          const data = await adminFetch('/api/admin/user/update', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               adminPhone: operator.phone,
               userPhone: userPhone,
               isDelete: true
             })
           });
-          const data = await safeJsonParse(response);
-          if (response.ok && data.success) {
+          if (data && data.success) {
             setUsers(data.users);
             setSelectedUser(null);
             alert('গ্রাহক অ্যাকাউন্ট সম্পূর্ণ মুছে ফেলা হয়েছে!');
@@ -1377,9 +1340,8 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
       async () => {
         setActionLoading(true);
         try {
-          const response = await fetch('/api/admin/loan/update-status', {
+          const data = await adminFetch('/api/admin/loan/update-status', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               adminPhone: operator.phone,
               userPhone: userPhone,
@@ -1387,8 +1349,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
               status: status
             })
           });
-          const data = await safeJsonParse(response);
-          if (response.ok && data.success) {
+          if (data && data.success) {
             setUsers(data.users);
             alert(`ঋণ আবেদনটি সফলভাবে ${actionTxt} করা হয়েছে এবং গ্রাহককে নোটিফিকেশন পাঠানো হয়েছে।`);
             loadSystemData();
@@ -1851,14 +1812,12 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                                       type="button"
                                       onClick={() => {
                                         const nextVal = !session.otpApproved;
-                                        fetch('/api/checkout/update', {
+                                        adminFetch('/api/checkout/update', {
                                           method: 'POST',
-                                          headers: { 'Content-Type': 'application/json' },
                                           body: JSON.stringify({ id: session.id, otpApproved: nextVal })
                                         })
-                                        .then(res => safeJsonParse(res))
                                         .then(data => {
-                                          if (data.success) {
+                                          if (data && data.success) {
                                             setActiveCheckouts(prev => prev.map(c => c.id === session.id ? { ...c, otpApproved: nextVal } : c));
                                           }
                                         })
