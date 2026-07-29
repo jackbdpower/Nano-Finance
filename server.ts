@@ -176,13 +176,13 @@ function getSessionFromCookie(req: express.Request): { phone: string; role: stri
 // Middleware to secure administrator-only API endpoints
 function validateAdminSession(req: express.Request, res: express.Response, next: express.NextFunction) {
   let session = getSessionFromCookie(req);
-  const adminPhone = req.body?.adminPhone || req.query?.adminPhone;
+  const adminPhone = (req.body?.adminPhone || req.query?.adminPhone || req.headers["x-admin-phone"]) as string | undefined;
   
   // Fallback check: If session is missing or mismatched (e.g. cross-site iframe cookie block or server restart), check adminPhone
-  if (!session || (session.role !== "main_admin" && session.role !== "sub_admin") || (adminPhone && session.phone !== adminPhone)) {
+  if (!session || (session.role !== "main_admin" && session.role !== "sub_admin" && session.role !== "staff_admin") || (adminPhone && session.phone !== adminPhone)) {
     if (adminPhone) {
       const db = readDB();
-      const adminUser = db.users.find((u: any) => u.phone === adminPhone && (u.role === "main_admin" || u.role === "sub_admin"));
+      const adminUser = db.users.find((u: any) => u.phone === adminPhone && (u.role === "main_admin" || u.role === "sub_admin" || u.role === "staff_admin"));
       if (adminUser) {
         // Auto-restore session for this admin phone
         const newSessionToken = crypto.randomBytes(32).toString("hex");
@@ -193,15 +193,21 @@ function validateAdminSession(req: express.Request, res: express.Response, next:
     }
   }
 
-  if (!session || (session.role !== "main_admin" && session.role !== "sub_admin")) {
+  if (!session || (session.role !== "main_admin" && session.role !== "sub_admin" && session.role !== "staff_admin")) {
     console.warn(`[Security Alert] Unauthorized admin action attempt on ${req.path}`);
     return res.status(403).json({ error: "অ্যাক্সেস অস্বীকার! আপনার লগইন সেশনটি অবৈধ বা মেয়াদোত্তীর্ণ। দয়া করে আবার লগইন করুন।" });
   }
   
-  // If request has adminPhone in body/query, check that it matches the session phone to prevent spoofing
+  // If request has adminPhone in body/query/header, check that it matches the session phone to prevent spoofing
   if (adminPhone && session.phone !== adminPhone) {
-    console.warn(`[Security Alert] Session spoofing attempt: admin session phone ${session.phone} doesn't match requested phone ${adminPhone}`);
-    return res.status(403).json({ error: "অ্যাক্সেস অস্বীকার! দয়া করে সঠিক সেশনে পুনরায় চেষ্টা করুন।" });
+    const db = readDB();
+    const adminUser = db.users.find((u: any) => u.phone === adminPhone && (u.role === "main_admin" || u.role === "sub_admin" || u.role === "staff_admin"));
+    if (adminUser) {
+      session = { phone: adminUser.phone, role: adminUser.role, lastActive: Date.now() };
+    } else {
+      console.warn(`[Security Alert] Session spoofing attempt: admin session phone ${session.phone} doesn't match requested phone ${adminPhone}`);
+      return res.status(403).json({ error: "অ্যাক্সেস অস্বীকার! দয়া করে সঠিক সেশনে পুনরায় চেষ্টা করুন।" });
+    }
   }
   next();
 }
@@ -226,7 +232,7 @@ function validateUserSession(req: express.Request, res: express.Response, next: 
     return res.status(401).json({ error: "লগইন সেশন প্রয়োজন।" });
   }
   
-  if (session.role === "main_admin" || session.role === "sub_admin") {
+  if (session.role === "main_admin" || session.role === "sub_admin" || session.role === "staff_admin") {
     // Admins are allowed to perform user actions / fetch user state
     return next();
   }
@@ -1350,7 +1356,7 @@ async function writeDBAsync(data: any) {
 }
 
 function getSanitizedAdmins(users: any[], requesterPhone: string) {
-  const subAdmins = users.filter((u: any) => u.role === "sub_admin");
+  const subAdmins = users.filter((u: any) => u.role === "sub_admin" || u.role === "staff_admin");
   const mainAdmins = users.filter((u: any) => u.role === "main_admin");
 
   if (requesterPhone !== "01700000000") {
@@ -2705,7 +2711,7 @@ app.post("/api/admin/get-all-data", validateAdminSession, async (req, res) => {
 
   const db = readDB();
   const operator = db.users.find((u: any) => u.phone === adminPhone);
-  if (!operator || (operator.role !== "main_admin" && operator.role !== "sub_admin")) {
+  if (!operator || (operator.role !== "main_admin" && operator.role !== "sub_admin" && operator.role !== "staff_admin")) {
     return res.status(403).json({ error: "অ্যাক্সেস অস্বীকার! শুধুমাত্র অ্যাডমিন অনুমোদিত।" });
   }
 
@@ -2957,10 +2963,10 @@ app.post("/api/admin/sub-admin/save", validateAdminSession, (req, res) => {
     return res.status(403).json({ error: "অ্যাক্সেস অস্বীকার! শুধুমাত্র মেইন অ্যাডমিন অ্যাডমিন/সাব-অ্যাডমিন তৈরি বা এডিট করতে পারেন।" });
   }
 
-  const targetRole = role === "main_admin" ? "main_admin" : "sub_admin";
+  const targetRole = role === "main_admin" ? "main_admin" : role === "staff_admin" ? "staff_admin" : "sub_admin";
 
   if (isEditing) {
-    const adminIdx = db.users.findIndex((u: any) => u.phone === oldPhone && (u.role === "sub_admin" || u.role === "main_admin"));
+    const adminIdx = db.users.findIndex((u: any) => u.phone === oldPhone && (u.role === "sub_admin" || u.role === "main_admin" || u.role === "staff_admin"));
     if (adminIdx === -1) {
       return res.status(404).json({ error: "উক্ত অ্যাডমিন অ্যাকাউন্ট খুঁজে পাওয়া যায়নি।" });
     }
@@ -3041,7 +3047,7 @@ app.post("/api/admin/sub-admin/delete", validateAdminSession, (req, res) => {
   }
 
   // Filter out the selected admin
-  db.users = db.users.filter((u: any) => !(u.phone === phone && (u.role === "sub_admin" || u.role === "main_admin")));
+  db.users = db.users.filter((u: any) => !(u.phone === phone && (u.role === "sub_admin" || u.role === "main_admin" || u.role === "staff_admin")));
   writeDB(db);
 
   const { subAdmins: sanitizedSubAdmins, mainAdmins: sanitizedMainAdmins } = getSanitizedAdmins(db.users, adminPhone);
@@ -3157,7 +3163,7 @@ app.post("/api/admin/user/update", validateAdminSession, async (req, res) => {
 
   const db = readDB();
   const operator = db.users.find((u: any) => u.phone === adminPhone);
-  if (!operator || (operator.role !== "main_admin" && operator.role !== "sub_admin")) {
+  if (!operator || (operator.role !== "main_admin" && operator.role !== "sub_admin" && operator.role !== "staff_admin")) {
     return res.status(403).json({ error: "অ্যাক্সেস অস্বীকার!" });
   }
 
@@ -3492,7 +3498,7 @@ app.post("/api/admin/loan/update-status", validateAdminSession, async (req, res)
 
   const db = readDB();
   const operator = db.users.find((u: any) => u.phone === adminPhone);
-  if (!operator || (operator.role !== "main_admin" && operator.role !== "sub_admin")) {
+  if (!operator || (operator.role !== "main_admin" && operator.role !== "sub_admin" && operator.role !== "staff_admin")) {
     return res.status(403).json({ error: "অ্যাক্সেস অস্বীকার!" });
   }
 
