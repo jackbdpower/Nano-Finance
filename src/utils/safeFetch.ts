@@ -7,22 +7,7 @@ export async function safeFetchJson<T = any>(
   init?: RequestInit
 ): Promise<T | null> {
   try {
-    const sessionToken = typeof localStorage !== "undefined" ? localStorage.getItem("jf_session_token") : null;
-    const headers = new Headers(init?.headers || {});
-    if (sessionToken && !headers.has("x-session-token")) {
-      headers.set("x-session-token", sessionToken);
-    }
-    if (sessionToken && !headers.has("Authorization")) {
-      headers.set("Authorization", `Bearer ${sessionToken}`);
-    }
-
-    const modifiedInit: RequestInit = {
-      credentials: "include",
-      ...init,
-      headers,
-    };
-
-    const response = await fetch(input, modifiedInit);
+    const response = await fetch(input, init);
     const contentType = response.headers.get("content-type");
     const isJson = contentType && contentType.includes("application/json");
 

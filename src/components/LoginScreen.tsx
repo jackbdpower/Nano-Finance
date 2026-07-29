@@ -70,9 +70,6 @@ export default function LoginScreen({ onLoginSuccess, initialPhone = '', setting
       setIsLoading(false);
 
       if (data && data.success) {
-        if (data.sessionToken) {
-          localStorage.setItem('jf_session_token', data.sessionToken);
-        }
         onLoginSuccess(data.user);
       } else {
         setErrorMsg((data && data.error) || 'লগইন করতে ব্যর্থ হয়েছে। পিন সঠিক কিনা পরীক্ষা করুন।');

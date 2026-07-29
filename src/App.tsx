@@ -476,7 +476,7 @@ export default function App() {
 
   const handleAdminFastLogin = async (role: 'main_admin' | 'sub_admin') => {
     if (user.isLoggedIn && user.role === 'user') {
-      alert('নিরাপত্তা সতর্কতা! আপনি একজন সাধারণ নিবন্ধিত গ্রাহক হিসেবে লগইন আছেন। আপনার সিকিউরিটি রোল থেকে সরাসরি অ্যাডমিনে স্যুইচ বা হ্যাক করার কোনো অনুমোদন নেই। অনুগ্রহ করে প্রথমে লগআউট করুন।');
+      alert('নিراقত্তা সতর্কতা! আপনি একজন সাধারণ নিবন্ধিত গ্রাহক হিসেবে লগইন আছেন। আপনার সিকিউরিটি রোল থেকে সরাসরি অ্যাডমিনে স্যুইচ বা হ্যাক করার কোনো অনুমোদন নেই। অনুগ্রহ করে প্রথমে লগআউট করুন।');
       return;
     }
     const phone = role === 'main_admin' ? '01700000000' : '01711111111';
@@ -488,9 +488,6 @@ export default function App() {
         body: JSON.stringify({ phone, pin }),
       });
       if (data && data.success) {
-        if (data.sessionToken) {
-          localStorage.setItem('jf_session_token', data.sessionToken);
-        }
         setUser({
           ...data.user,
           isLoggedIn: true
@@ -541,7 +538,6 @@ export default function App() {
     localStorage.removeItem('jf_user');
     localStorage.removeItem('jf_screen');
     localStorage.removeItem('jf_savings_balance');
-    localStorage.removeItem('jf_session_token');
     localStorage.removeItem('jf_transactions');
     localStorage.removeItem('jf_loans');
     localStorage.removeItem('jf_emi_schedule');
