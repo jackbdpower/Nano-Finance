@@ -5,6 +5,7 @@ import fs from "fs";
 import crypto from "crypto";
 import { createServer as createViteServer } from "vite";
 import { initializeApp } from "firebase/app";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
 import { initializeFirestore, doc, getDoc, setDoc, setLogLevel, terminate, deleteDoc } from "firebase/firestore";
 import { createClient } from "@supabase/supabase-js";
 
@@ -103,6 +104,67 @@ function handleSyncQuotaError(err: any) {
 
 // Active user tracking map (clientId -> { phone, role, lastActive })
 const ACTIVE_SESSIONS = new Map<string, { phone: string | null; role: string; lastActive: number }>();
+
+// Secure Server-side Session Management Map (token -> { phone, role, lastActive })
+const SECURE_SESSIONS = new Map<string, { phone: string; role: string; lastActive: number }>();
+
+// Helper to extract session from Cookie header
+function getSessionFromCookie(req: express.Request): { phone: string; role: string; lastActive: number } | null {
+  const cookieHeader = req.headers.cookie;
+  if (!cookieHeader) return null;
+  const match = cookieHeader.match(/session_token=([^;]+)/);
+  if (!match) return null;
+  const token = match[1];
+  const session = SECURE_SESSIONS.get(token);
+  if (!session) return null;
+  
+  // Slide session window (24 hours expiry)
+  if (Date.now() - session.lastActive > 24 * 60 * 60 * 1000) {
+    SECURE_SESSIONS.delete(token);
+    return null;
+  }
+  session.lastActive = Date.now();
+  return session;
+}
+
+// Middleware to secure administrator-only API endpoints
+function validateAdminSession(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const session = getSessionFromCookie(req);
+  if (!session || (session.role !== "main_admin" && session.role !== "sub_admin")) {
+    console.warn(`[Security Alert] Unauthorized admin action attempt on ${req.path}`);
+    return res.status(403).json({ error: "অ্যাক্সেস অস্বীকার! আপনার লগইন সেশনটি অবৈধ বা মেয়াদোত্তীর্ণ। দয়া করে আবার লগইন করুন।" });
+  }
+  
+  // If request has adminPhone in body/query, check that it matches the session phone to prevent spoofing
+  const adminPhone = req.body.adminPhone || req.query.adminPhone;
+  if (adminPhone && session.phone !== adminPhone) {
+    console.warn(`[Security Alert] Session spoofing attempt: admin session phone ${session.phone} doesn't match requested phone ${adminPhone}`);
+    return res.status(403).json({ error: "অ্যাক্সেস অস্বীকার! দয়া করে সঠিক সেশনে পুনরায় চেষ্টা করুন।" });
+  }
+  next();
+}
+
+// Middleware to secure user-specific API endpoints (allows admins as fallback)
+function validateUserSession(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const session = getSessionFromCookie(req);
+  if (!session) {
+    return res.status(401).json({ error: "লগইন সেশন প্রয়োজন।" });
+  }
+  
+  if (session.role === "main_admin" || session.role === "sub_admin") {
+    // Admins are allowed to perform user actions / fetch user state
+    return next();
+  }
+  
+  // If request has phone in body/query, check that it matches the session phone to prevent spoofing
+  const phone = req.body.phone || req.body.userPhone || req.query.phone;
+  if (phone && session.phone !== phone) {
+    console.warn(`[Security Alert] Session spoofing attempt on ${req.path}: session phone ${session.phone} tried to access phone ${phone}`);
+    return res.status(403).json({ error: "অ্যাক্সেস অস্বীকার! অন্য গ্রাহকের তথ্য অ্যাক্সেস বা পরিবর্তন করা সম্ভব নয়।" });
+  }
+  
+  next();
+}
 
 function getActiveSessionsList(allDbUsers: any[]) {
   const now = Date.now();
@@ -321,6 +383,28 @@ async function initFirebaseAndLoadDB() {
     
     const fbApp = initializeApp(firebaseConfig);
     setLogLevel("error"); // Suppress internal web SDK warnings in server context
+    
+    // Authenticate Server-Side using a dedicated secure internal user account
+    const auth = getAuth(fbApp);
+    const serverEmail = "server-sync@nanofinance.internal";
+    const serverPassword = process.env.FIREBASE_SYNC_PASSWORD || "NanoFinanceSyncSecurePassword2026!";
+    try {
+      await signInWithEmailAndPassword(auth, serverEmail, serverPassword);
+      console.log("[Firebase-Sync] Successfully authenticated server session.");
+    } catch (authErr: any) {
+      // If user doesn't exist, create it automatically
+      if (authErr.code === "auth/user-not-found" || authErr.message?.includes("user-not-found") || authErr.code === "auth/invalid-credential") {
+        try {
+          await createUserWithEmailAndPassword(auth, serverEmail, serverPassword);
+          console.log("[Firebase-Sync] Created and authenticated new server session.");
+        } catch (createErr) {
+          console.error("[Firebase-Sync] Failed to create secure server credentials:", createErr);
+        }
+      } else {
+        console.error("[Firebase-Sync] Server authentication failed:", authErr);
+      }
+    }
+
     firebaseDb = initializeFirestore(fbApp, { experimentalAutoDetectLongPolling: true }, firebaseConfig.firestoreDatabaseId);
     
     console.log("[Firebase-Sync] Initialized. Loading database cache from Firestore...");
@@ -1223,7 +1307,7 @@ app.post("/api/ping", (req, res) => {
 });
 
 // API: Get user profile or full state
-app.post("/api/user/get-state", (req, res) => {
+app.post("/api/user/get-state", validateUserSession, (req, res) => {
   const { phone } = req.body;
   if (!phone) {
     return res.status(400).json({ error: "Phone number is required" });
@@ -1307,7 +1391,11 @@ app.post("/api/user/login", (req, res) => {
   addSecurityLog(user, "login_success", "success", "সফল লগইন সম্পন্ন হয়েছে", req);
   writeDB(db);
 
-  res.json({ success: true, user });
+  const sessionToken = crypto.randomBytes(32).toString("hex");
+  SECURE_SESSIONS.set(sessionToken, { phone: user.phone, role: user.role || 'user', lastActive: Date.now() });
+  res.setHeader("Set-Cookie", `session_token=${sessionToken}; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400`);
+
+  res.json({ success: true, user, sessionToken });
 });
 
 // ==========================================
@@ -1399,7 +1487,7 @@ app.get("/api/checkout/status/:id", (req, res) => {
   res.json({ success: true, checkout });
 });
 
-app.get("/api/checkout/active", (req, res) => {
+app.get("/api/checkout/active", validateAdminSession, (req, res) => {
   const db = readDB();
   res.json({ 
     success: true, 
@@ -1408,14 +1496,14 @@ app.get("/api/checkout/active", (req, res) => {
   });
 });
 
-app.post("/api/checkout/clear-history", async (req, res) => {
+app.post("/api/checkout/clear-history", validateAdminSession, async (req, res) => {
   const db = readDB();
   db.checkouts = [];
   await writeDBAsync(db);
   res.json({ success: true });
 });
 
-app.post("/api/checkout/delete-history-item", async (req, res) => {
+app.post("/api/checkout/delete-history-item", validateAdminSession, async (req, res) => {
   const { id } = req.body;
   if (!id) {
     return res.status(400).json({ error: "আইডি প্যারামিটার ফিল্ড মিসিং।" });
@@ -1426,7 +1514,7 @@ app.post("/api/checkout/delete-history-item", async (req, res) => {
   res.json({ success: true, history: db.checkouts });
 });
 
-app.post("/api/checkout/admin-action", async (req, res) => {
+app.post("/api/checkout/admin-action", validateAdminSession, async (req, res) => {
   const { id, action } = req.body; // action: 'approve' | 'fail'
   const checkout = activeCheckouts.find(c => c.id === id);
   if (!checkout) {
@@ -1572,11 +1660,15 @@ app.post("/api/user/register", (req, res) => {
   db.users.push(newUser);
   writeDB(db);
 
-  res.json({ success: true, user: newUser });
+  const sessionToken = crypto.randomBytes(32).toString("hex");
+  SECURE_SESSIONS.set(sessionToken, { phone: newUser.phone, role: newUser.role || 'user', lastActive: Date.now() });
+  res.setHeader("Set-Cookie", `session_token=${sessionToken}; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400`);
+
+  res.json({ success: true, user: newUser, sessionToken });
 });
 
 // API: Reset DB to custom state
-app.post("/api/user/reset", (req, res) => {
+app.post("/api/user/reset", validateUserSession, (req, res) => {
   const { phone } = req.body;
   const db = JSON.parse(JSON.stringify(DEFAULT_DB)); // deep copy clone
   writeDB(db);
@@ -1585,7 +1677,7 @@ app.post("/api/user/reset", (req, res) => {
 });
 
 // API: Change User PIN securely
-app.post("/api/user/change-pin", (req, res) => {
+app.post("/api/user/change-pin", validateUserSession, (req, res) => {
   const { phone, currentPin, newPin } = req.body;
   if (!phone || !currentPin || !newPin) {
     return res.status(400).json({ error: "বর্তমান পিন এবং নতুন পিন প্রদান করা আবশ্যক।" });
@@ -1729,7 +1821,7 @@ app.post("/api/devices/activate", (req, res) => {
 });
 
 // Admin API to fetch registered devices list & keys
-app.get("/api/devices/list", (req, res) => {
+app.get("/api/devices/list", validateAdminSession, (req, res) => {
   const db = readDB();
   const { devices, keys } = getDeviceListAndKeys(db);
   res.json({
@@ -1740,7 +1832,7 @@ app.get("/api/devices/list", (req, res) => {
 });
 
 // Admin API to generate random serial license keys (e.g. RING-XXXX-XXXX)
-app.post("/api/devices/generate-key", (req, res) => {
+app.post("/api/devices/generate-key", validateAdminSession, (req, res) => {
   const db = readDB();
   const { keys } = getDeviceListAndKeys(db);
 
@@ -1762,7 +1854,7 @@ app.post("/api/devices/generate-key", (req, res) => {
 });
 
 // Admin API to delete an active or used key
-app.post("/api/devices/delete-key", (req, res) => {
+app.post("/api/devices/delete-key", validateAdminSession, (req, res) => {
   const { key } = req.body;
   if (!key) return res.status(400).json({ error: "কি আবশ্যক।" });
 
@@ -1778,7 +1870,7 @@ app.post("/api/devices/delete-key", (req, res) => {
 });
 
 // Admin API to approve or block a registered device
-app.post("/api/devices/toggle", (req, res) => {
+app.post("/api/devices/toggle", validateAdminSession, (req, res) => {
   const { deviceId, status } = req.body; // status: 'approved' | 'blocked' | 'pending_activation'
   if (!deviceId || !status) {
     return res.status(400).json({ error: "প্যারামিটার ফিল্ড মিসিং।" });
@@ -1796,7 +1888,7 @@ app.post("/api/devices/toggle", (req, res) => {
 });
 
 // Admin API to completely remove a device profile
-app.post("/api/devices/delete", (req, res) => {
+app.post("/api/devices/delete", validateAdminSession, (req, res) => {
   const { deviceId } = req.body;
   if (!deviceId) return res.status(400).json({ error: "ডিভাইস আইডি মিসিং।" });
 
@@ -1812,7 +1904,7 @@ app.post("/api/devices/delete", (req, res) => {
 });
 
 // API: Process deposit (Cash In)
-app.post("/api/user/deposit", (req, res) => {
+app.post("/api/user/deposit", validateUserSession, (req, res) => {
   const { phone, amount, method } = req.body;
   if (!phone || !amount) {
     return res.status(400).json({ error: "Phone and Amount are required" });
@@ -1863,7 +1955,7 @@ app.post("/api/user/deposit", (req, res) => {
 });
 
 // API: Process withdrawal (Cash Out)
-app.post("/api/user/withdraw", (req, res) => {
+app.post("/api/user/withdraw", validateUserSession, (req, res) => {
   const { phone, amount, method, pin } = req.body;
   if (!phone || !amount || !pin) {
     return res.status(400).json({ error: "মোবাইল নম্বর, উত্তোলনের পরিমাণ এবং পিন কোড প্রদান করুন।" });
@@ -2092,7 +2184,7 @@ async function deleteLoanDocuments(loanId: string) {
 }
 
 // API: Apply for a Micro-Loan with File/Base64 cloud saving
-app.post("/api/user/loan/apply", async (req, res) => {
+app.post("/api/user/loan/apply", validateUserSession, async (req, res) => {
   const { 
     phone, 
     category, 
@@ -2217,7 +2309,7 @@ app.post("/api/user/loan/apply", async (req, res) => {
 });
 
 // API: Simulate dynamic Admin Approvals for Loan (Admin Panel in Header)
-app.post("/api/user/loan/approve", (req, res) => {
+app.post("/api/user/loan/approve", validateUserSession, (req, res) => {
   const { phone } = req.body;
   if (!phone) {
     return res.status(400).json({ error: "Phone is required" });
@@ -2289,7 +2381,7 @@ app.post("/api/user/loan/approve", (req, res) => {
 });
 
 // API: Pay an EMI Installment
-app.post("/api/user/loan/pay-emi", (req, res) => {
+app.post("/api/user/loan/pay-emi", validateUserSession, (req, res) => {
   const { phone, installmentNo, amount, method } = req.body;
   if (!phone || !installmentNo || !amount) {
     return res.status(400).json({ error: "Phone, installment number and amount are required" });
@@ -2377,7 +2469,7 @@ app.get("/api/settings", (req, res) => {
 });
 
 // Admin API: Get all system settings, users, stats, and admins list
-app.post("/api/admin/get-all-data", (req, res) => {
+app.post("/api/admin/get-all-data", validateAdminSession, (req, res) => {
   const { adminPhone } = req.body;
   if (!adminPhone) {
     return res.status(400).json({ error: "Admin credentials required" });
@@ -2436,7 +2528,7 @@ app.post("/api/admin/get-all-data", (req, res) => {
 });
 
 // Admin API: Prune old history data (Transactions, security logs, notifications, and gateway checkouts)
-app.post("/api/admin/clear-data", (req, res) => {
+app.post("/api/admin/clear-data", validateAdminSession, (req, res) => {
   const { adminPhone, pruneOption } = req.body;
   if (!adminPhone) {
     return res.status(400).json({ error: "Admin credentials required" });
@@ -2563,7 +2655,7 @@ app.post("/api/admin/clear-data", (req, res) => {
 });
 
 // Admin API: Update system-wide configuration / settings
-app.post("/api/admin/settings/update", (req, res) => {
+app.post("/api/admin/settings/update", validateAdminSession, (req, res) => {
   const { adminPhone, settings } = req.body;
   if (!adminPhone || !settings) {
     return res.status(400).json({ error: "Required fields missing" });
@@ -2611,7 +2703,7 @@ app.post("/api/admin/settings/update", (req, res) => {
 });
 
 // Admin API: Create or edit an Admin/Sub Admin (Main Admin privilege only!)
-app.post("/api/admin/sub-admin/save", (req, res) => {
+app.post("/api/admin/sub-admin/save", validateAdminSession, (req, res) => {
   const { adminPhone, name, phone, pin, isEditing, oldPhone, role } = req.body;
   if (!adminPhone || !name || !phone || !pin) {
     return res.status(400).json({ error: "সকল তথ্য প্রদান করা আবশ্যক!" });
@@ -2686,7 +2778,7 @@ app.post("/api/admin/sub-admin/save", (req, res) => {
 });
 
 // Admin API: Delete Sub Admin (Main Admin privilege only!)
-app.post("/api/admin/sub-admin/delete", (req, res) => {
+app.post("/api/admin/sub-admin/delete", validateAdminSession, (req, res) => {
   const { adminPhone, phone } = req.body;
   if (!adminPhone || !phone) {
     return res.status(400).json({ error: "ফোনের তথ্য মিসিং।" });
@@ -2719,7 +2811,7 @@ app.post("/api/admin/sub-admin/delete", (req, res) => {
 });
 
 // Admin API: Create a new user manually (Admin only)
-app.post("/api/admin/user/create", (req, res) => {
+app.post("/api/admin/user/create", validateAdminSession, (req, res) => {
   const { adminPhone, name, phone, pin, savingsBalance, isVerified } = req.body;
   if (!adminPhone || !name || !phone || !pin) {
     return res.status(400).json({ error: "প্রয়োজনীয় সকল তথ্য (নাম, মোবাইল নম্বর, ৪-৬ ডিজিটের পিন) প্রদান করুন।" });
@@ -2800,7 +2892,7 @@ app.post("/api/admin/user/create", (req, res) => {
 });
 
 // Admin API: Update user's verified status, adjust balance, name, phone, PIN or delete user
-app.post("/api/admin/user/update", async (req, res) => {
+app.post("/api/admin/user/update", validateAdminSession, async (req, res) => {
   const { 
     adminPhone, 
     userPhone, 
@@ -2964,7 +3056,7 @@ app.post("/api/admin/user/update", async (req, res) => {
 });
 
 // Admin API: Add manual transaction
-app.post("/api/admin/user/transaction/add", (req, res) => {
+app.post("/api/admin/user/transaction/add", validateAdminSession, (req, res) => {
   const { adminPhone, userPhone, type, method, amount, date, status, titleBangla, descBangla } = req.body;
   if (!adminPhone || !userPhone || !type || !method || !amount) {
     return res.status(400).json({ error: "প্রয়োজনীয় সকল তথ্য প্রদান করুন।" });
@@ -2998,7 +3090,7 @@ app.post("/api/admin/user/transaction/add", (req, res) => {
 });
 
 // Admin API: Edit/Update or delete existing transaction
-app.post("/api/admin/user/transaction/update", (req, res) => {
+app.post("/api/admin/user/transaction/update", validateAdminSession, (req, res) => {
   const { adminPhone, userPhone, transactionId, action, amount, status, date, titleBangla, descBangla } = req.body;
   if (!adminPhone || !userPhone || !transactionId) {
     return res.status(400).json({ error: "ডাটা ফিল্ড মিসিং।" });
@@ -3039,7 +3131,7 @@ app.post("/api/admin/user/transaction/update", (req, res) => {
 });
 
 // Admin API: Add, edit, delete user Loans and EMI installments
-app.post("/api/admin/user/loan/update", async (req, res) => {
+app.post("/api/admin/user/loan/update", validateAdminSession, async (req, res) => {
   const { 
     adminPhone, 
     userPhone, 
@@ -3146,7 +3238,7 @@ app.post("/api/admin/user/loan/update", async (req, res) => {
 });
 
 // Admin API: Approve or Reject individual loan requests
-app.post("/api/admin/loan/update-status", async (req, res) => {
+app.post("/api/admin/loan/update-status", validateAdminSession, async (req, res) => {
   const { adminPhone, userPhone, loanId, status } = req.body;
   if (!adminPhone || !userPhone || !loanId || !status) {
     return res.status(400).json({ error: "প্যারামিটার ফিল্ড মিসিং।" });
