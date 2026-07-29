@@ -1,6 +1,8 @@
 {
-  "name": "Nano Finance",
+  "name": "Remix Nano Finance",
   "description": "ন্যানো-ফাইন্যান্স সিলভার অ্যাডভান্সড ড্যাশবোর্ড ও সিমুলেটর",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
