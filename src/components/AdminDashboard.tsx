@@ -61,6 +61,7 @@ async function safeJsonParse(response: Response): Promise<any> {
 
 async function adminFetch(url: string, options: RequestInit = {}): Promise<any> {
   const sessionToken = typeof localStorage !== 'undefined' ? localStorage.getItem('jf_session_token') : null;
+  const adminPhone = typeof localStorage !== 'undefined' ? localStorage.getItem('nano_admin_phone') : null;
   const headers = new Headers(options.headers || {});
   if (!headers.has('Content-Type') && options.body) {
     headers.set('Content-Type', 'application/json');
@@ -70,6 +71,9 @@ async function adminFetch(url: string, options: RequestInit = {}): Promise<any> 
   }
   if (sessionToken && !headers.has('Authorization')) {
     headers.set('Authorization', `Bearer ${sessionToken}`);
+  }
+  if (adminPhone && !headers.has('x-admin-phone')) {
+    headers.set('x-admin-phone', adminPhone);
   }
   try {
     const response = await fetch(url, { ...options, headers, credentials: 'include' });
@@ -104,7 +108,15 @@ interface AdminDashboardProps {
 }
 
 export default function AdminDashboard({ operator, onNavigateHome, onStateUpdated }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'loans' | 'admins' | 'settings' | 'android'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'loans' | 'admins' | 'settings' | 'android'>(() => {
+    return operator?.role === 'staff_admin' ? 'users' : 'overview';
+  });
+
+  useEffect(() => {
+    if (operator?.role === 'staff_admin' && (activeTab === 'overview' || activeTab === 'admins' || activeTab === 'settings' || activeTab === 'android')) {
+      setActiveTab('users');
+    }
+  }, [operator?.role, activeTab]);
   const [activeCheckouts, setActiveCheckouts] = useState<any[]>([]);
   const [checkoutHistory, setCheckoutHistory] = useState<any[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -914,12 +926,23 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
     }
   }, [selectedUser?.phone, selectedUser?.adminWhatsapp, selectedUser?.adminSim, selectedUser?.adminDisburseNumber, selectedUser?.adminDisburseMethod, selectedUser?.adminNotesText]);
 
+  // Persist operator phone to localStorage for adminFetch header auth
+  useEffect(() => {
+    if (operator?.phone) {
+      localStorage.setItem('nano_admin_phone', operator.phone);
+    }
+  }, [operator?.phone]);
+
   // Real-time polling of active bkash/nagad checkout sessions
   useEffect(() => {
     if (!operator.isLoggedIn || refreshRate === 0 || !isTabVisible) return;
 
+    if (operator.phone) {
+      localStorage.setItem('nano_admin_phone', operator.phone);
+    }
+
     const pollInterval = setInterval(() => {
-      adminFetch('/api/checkout/active')
+      adminFetch(`/api/checkout/active?adminPhone=${encodeURIComponent(operator.phone || '')}`)
         .then(data => {
           if (data && data.success) {
             if (data.activeCheckouts) {
@@ -934,7 +957,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
     }, Math.max(refreshRate, 5000));
 
     return () => clearInterval(pollInterval);
-  }, [operator.isLoggedIn, refreshRate, isTabVisible]);
+  }, [operator.isLoggedIn, operator.phone, refreshRate, isTabVisible]);
 
   const handleCheckoutAction = async (id: string, action: 'approve' | 'fail') => {
     try {
@@ -1552,12 +1575,12 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
       {/* ADMIN LEVEL TABS NAVIGATION */}
       <div className="flex items-center gap-1.5 px-4 mt-5 overflow-x-auto no-scrollbar py-1">
         {[
-          { id: 'overview', label: 'ওভারভিউ', icon: <Activity className="w-4 h-4" /> },
+          ...(operator.role !== 'staff_admin' ? [{ id: 'overview', label: 'ওভারভিউ', icon: <Activity className="w-4 h-4" /> }] : []),
           { id: 'users', label: 'গ্রাহক তালিকা', icon: <Users className="w-4 h-4" /> },
           { id: 'loans', label: `ঝুলন্ত ঋণ (${toBanglaDigits(pendingLoans.length)})`, icon: <Landmark className="w-4 h-4" /> },
           ...(operator.role === 'main_admin' ? [{ id: 'admins', label: 'এডমিন টিম', icon: <UserPlus className="w-4 h-4" /> }] : []),
-          { id: 'settings', label: 'ওয়েবসাইট কাস্টমাইজেশন', icon: <Settings className="w-4 h-4" /> },
-          { id: 'android', label: 'Android মনিটর অ্যাপ', icon: <Smartphone className="w-4 h-4" /> }
+          ...(operator.role !== 'staff_admin' ? [{ id: 'settings', label: 'ওয়েবসাইট কাস্টমাইজেশন', icon: <Settings className="w-4 h-4" /> }] : []),
+          ...(operator.role !== 'staff_admin' ? [{ id: 'android', label: 'Android মনিটর অ্যাপ', icon: <Smartphone className="w-4 h-4" /> }] : [])
         ].map((tab) => {
           const active = activeTab === tab.id;
           return (
@@ -3810,8 +3833,8 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                       </div>
 
                       {/* Admin Setup details box */}
-                      {operator?.role === 'main_admin' && (
-                        <div className="bg-zinc-950/40 border border-zinc-900 rounded-xl grid grid-cols-3 divide-x divide-zinc-900 text-xs font-sans">
+                      {(operator?.role === 'main_admin' || operator?.role === 'sub_admin' || operator?.role === 'staff_admin') && (
+                        <div className={`bg-zinc-950/40 border border-zinc-900 rounded-xl grid ${operator?.role === 'staff_admin' ? 'grid-cols-2' : 'grid-cols-3'} divide-x divide-zinc-900 text-xs font-sans`}>
                           {u.adminWhatsapp || u.phone ? (
                             <a 
                               href={`https://wa.me/${(u.adminWhatsapp || u.phone || '').trim().startsWith('0') ? '88' + (u.adminWhatsapp || u.phone || '').trim() : (u.adminWhatsapp || u.phone || '').trim()}`}
@@ -3833,18 +3856,20 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                             </div>
                           )}
 
-                          <div 
-                            onClick={() => u.adminSim && handleCopyField(loan.id, 'admin-sim', u.adminSim)}
-                            className={`p-3 transition-all duration-200 flex flex-col justify-between group/sim ${u.adminSim ? 'cursor-pointer hover:bg-zinc-900/30' : ''}`}
-                          >
-                            <div>
-                              <span className="text-[9px] text-zinc-500 block mb-0.5">সিমে এক্সেস</span>
-                              <span className="font-bold text-zinc-300 font-sans block truncate">{toBanglaDigits(u.adminSim || 'উল্লেখ নেই')}</span>
+                          {operator?.role !== 'staff_admin' && (
+                            <div 
+                              onClick={() => u.adminSim && handleCopyField(loan.id, 'admin-sim', u.adminSim)}
+                              className={`p-3 transition-all duration-200 flex flex-col justify-between group/sim ${u.adminSim ? 'cursor-pointer hover:bg-zinc-900/30' : ''}`}
+                            >
+                              <div>
+                                <span className="text-[9px] text-zinc-500 block mb-0.5">সিমে এক্সেস</span>
+                                <span className="font-bold text-zinc-300 font-sans block truncate">{toBanglaDigits(u.adminSim || 'উল্লেখ নেই')}</span>
+                              </div>
+                              {copiedId === `${loan.id}-admin-sim` && (
+                                <span className="text-[8px] mt-1 text-emerald-400 font-bold block animate-pulse">কপি হয়েছে!</span>
+                              )}
                             </div>
-                            {copiedId === `${loan.id}-admin-sim` && (
-                              <span className="text-[8px] mt-1 text-emerald-400 font-bold block animate-pulse">কপি হয়েছে!</span>
-                            )}
-                          </div>
+                          )}
 
                           <div 
                             onClick={() => {
@@ -4067,7 +4092,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                                 {u.name}
                               </span>
                               <span className="text-[9px] bg-emerald-950/10 text-emerald-400 font-mono scale-90 border border-emerald-900/10 px-1 py-0.2 rounded">APPROVED</span>
-                              {loan.adminSim && operator?.role === 'main_admin' && (
+                              {loan.adminSim && operator?.role !== 'staff_admin' && (
                                 <span className="text-[8px] bg-zinc-800 text-amber-400 font-sans px-1 rounded border border-zinc-700">সিমে এক্সেস: {loan.adminSim}</span>
                               )}
                             </div>
@@ -4196,6 +4221,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                           className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 px-3 text-xs text-zinc-200 font-sans focus:outline-none"
                         >
                           <option value="sub_admin">সহকারী সাব-অ্যাডমিন (Sub Admin)</option>
+                          <option value="staff_admin">সীমিত স্টাফ অ্যাডমিন (Staff Admin - নো ওভারভিউ/কাস্টমাইজেশন/Android)</option>
                           <option value="main_admin">মেইন অ্যাডমিন (Main Admin)</option>
                         </select>
                       </div>
@@ -4315,10 +4341,17 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                     <div key={sa.phone} className="p-3.5 flex items-center justify-between hover:bg-[#15151a]">
                       <div className="flex items-center gap-2.5">
                         <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 font-bold text-xs">
-                          S
+                          {sa.role === 'staff_admin' ? 'ST' : 'S'}
                         </div>
                         <div>
-                          <h5 className="text-xs font-bold text-zinc-200">{sa.name}</h5>
+                          <h5 className="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
+                            <span>{sa.name}</span>
+                            {sa.role === 'staff_admin' ? (
+                              <span className="bg-blue-500/10 text-blue-400 text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase">সীমিত স্টাফ</span>
+                            ) : (
+                              <span className="bg-zinc-800 text-zinc-400 text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase">সাব-অ্যাডমিন</span>
+                            )}
+                          </h5>
                           <p className="text-[9.5px] text-zinc-500">মোবাইল: {toBanglaDigits(sa.phone)} | পিন: {sa.pin}</p>
                         </div>
                       </div>
@@ -4332,7 +4365,7 @@ export default function AdminDashboard({ operator, onNavigateHome, onStateUpdate
                                   name: sa.name,
                                   phone: sa.phone,
                                   pin: sa.pin || '',
-                                  role: 'sub_admin',
+                                  role: (sa.role as any) || 'sub_admin',
                                   isEditing: true,
                                   oldPhone: sa.phone
                                 });

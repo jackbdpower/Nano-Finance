@@ -28,7 +28,7 @@ export interface User {
   isLoggedIn: boolean;
   isVerified: boolean;
   avatarUrl?: string;
-  role?: 'user' | 'main_admin' | 'sub_admin';
+  role?: 'user' | 'main_admin' | 'sub_admin' | 'staff_admin';
   securityLogs?: SecurityLog[];
   savingsBalance?: number;
   transactions?: Transaction[];
